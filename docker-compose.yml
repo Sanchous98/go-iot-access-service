@@ -1,0 +1,51 @@
+version: '3.7'
+
+services:
+  access:
+    container_name: go-iot-access-service
+    image: golang:alpine
+    working_dir: /app
+    command: "go run ./cmd/access/main.go"
+    environment:
+      - APP_ENV=dev
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+    ports:
+      - "6060:6060"
+      - "80:80"
+    networks:
+      4suites:
+        aliases:
+          - iot_access_service-app
+  iot:
+    container_name: go-iot-service-app
+    image: golang:alpine
+    working_dir: /app
+    command: "go run ./cmd/iot/main.go"
+    environment:
+      - APP_ENV=dev
+    volumes:
+      - ./:/app
+    networks:
+      4suites:
+        aliases:
+          - iot_service-app
+
+  upgrade:
+    container_name: go-iot-upgrade-service-app
+    image: golang:alpine
+    working_dir: /app
+    command: "go run ./cmd/upgrade/main.go"
+    environment:
+      - APP_ENV=dev
+    volumes:
+      - ./:/app
+    networks:
+      4suites:
+        aliases:
+          - iot_upgrade_service-app
+networks:
+  4suites:
+    external: true
+    name: 4suites

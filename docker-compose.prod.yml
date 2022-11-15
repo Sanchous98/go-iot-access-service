@@ -1,0 +1,10 @@
+services:
+  access:
+    environment:
+      - APP_ENV=prod
+  iot:
+    environment:
+      - APP_ENV=prod
+  upgrade:
+    environment:
+      - APP_ENV=prod
