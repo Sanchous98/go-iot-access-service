@@ -192,8 +192,12 @@ func (s *DeviceService) sync(device *models.Device, lockOpened func(messages.Eve
 		var response messages.EventResponse[messages.LockResponse]
 		err := json.Unmarshal(message.Payload(), &response)
 
-		if err == nil &&
-			response.Event.EventType == messages.LockActionResponse &&
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		if response.Event.EventType == messages.LockActionResponse &&
 			response.TransactionId == 0 &&
 			response.Event.Payload.LockActionStatus != messages.ExtRelayStateLockStatus {
 			s.aggregator.Unregister(handler)

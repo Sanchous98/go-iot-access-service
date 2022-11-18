@@ -13,6 +13,7 @@ import (
 )
 
 var cache sync.Map
+var db *sqlx.DB
 
 type responseShape struct {
 	RecloseDelay uint8 `json:"recloseDelay,omitempty"`
@@ -25,13 +26,16 @@ func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
 		return item.(string)
 	}
 
-	db, err := sqlx.Open("mysql", di.Application().GetParam("DATABASE_DSN"))
-	if err != nil {
-		log.Println(err)
-		return ""
+	var err error
+
+	if db == nil {
+		db, err = sqlx.Open("mysql", di.Application().GetParam("DATABASE_DSN"))
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
 	}
 
-	defer db.Close()
 	var macId []string
 	err = db.Select(&macId, "SELECT mac_id FROM devices WHERE id = ?", deviceCoreId)
 	if err != nil {

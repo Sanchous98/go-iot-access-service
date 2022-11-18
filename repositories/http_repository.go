@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"bitbucket.org/4suites/iot-service-golang/utils"
 	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -13,7 +14,7 @@ type WithEndpoint interface {
 }
 
 type Repository[T WithEndpoint] interface {
-	Find(id string) T
+	Find(id utils.UUID) T
 	FindAll() []T
 }
 
@@ -37,12 +38,12 @@ func (r *RegistryRepository[T]) GetUrl() string {
 	return r.ApiBaseUrl + model.GetEndpoint()
 }
 
-func (r *RegistryRepository[T]) Find(id string) (result T) {
+func (r *RegistryRepository[T]) Find(id utils.UUID) (result T) {
 	return r.find(id)
 }
 
-func (r *RegistryRepository[T]) find(id string) T {
-	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.GetUrl(), id, r.ApiKey)).Add("Accept", "application/json")
+func (r *RegistryRepository[T]) find(id utils.UUID) T {
+	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.GetUrl(), id.String(), r.ApiKey)).Add("Accept", "application/json")
 	code, body, errors := agent.Bytes()
 
 	if len(errors) != 0 {

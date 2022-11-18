@@ -3,6 +3,7 @@ package repositories
 import (
 	"bitbucket.org/4suites/iot-service-golang/cache"
 	"bitbucket.org/4suites/iot-service-golang/models"
+	"bitbucket.org/4suites/iot-service-golang/utils"
 )
 
 type BrokerRepository struct {
@@ -10,8 +11,8 @@ type BrokerRepository struct {
 	cache                               cache.Cache[*models.Broker]
 }
 
-func (r *BrokerRepository) Find(id string) *models.Broker {
-	if item, hit := r.cache.Get(func(b *models.Broker) bool { return b.Id.String() == id }); hit {
+func (r *BrokerRepository) Find(id utils.UUID) *models.Broker {
+	if item, hit := r.cache.Get(func(b *models.Broker) bool { return b.Id == id }); hit {
 		return item
 	}
 

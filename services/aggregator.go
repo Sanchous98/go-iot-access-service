@@ -2,13 +2,14 @@ package services
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/repositories"
+	"bitbucket.org/4suites/iot-service-golang/utils"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"sync"
 	"unsafe"
 )
 
 type Connectable interface {
-	GetId() string
+	GetId() utils.UUID
 	GetOptions() *mqtt.ClientOptions
 	GetTopics() map[string]byte
 }

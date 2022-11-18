@@ -3,6 +3,7 @@ package repositories
 import (
 	"bitbucket.org/4suites/iot-service-golang/cache"
 	"bitbucket.org/4suites/iot-service-golang/models"
+	"bitbucket.org/4suites/iot-service-golang/utils"
 )
 
 type GatewayRepository struct {
@@ -11,8 +12,8 @@ type GatewayRepository struct {
 	cache                                cache.Cache[*models.Gateway]
 }
 
-func (r *GatewayRepository) Find(id string) *models.Gateway {
-	if item, hit := r.cache.Get(func(g *models.Gateway) bool { return g.Id.String() == id }); hit {
+func (r *GatewayRepository) Find(id utils.UUID) *models.Gateway {
+	if item, hit := r.cache.Get(func(g *models.Gateway) bool { return g.Id == id }); hit {
 		return item
 	}
 
