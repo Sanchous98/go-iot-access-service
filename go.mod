@@ -6,6 +6,7 @@ require (
 	github.com/Sanchous98/go-di v1.3.6
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/go-sql-driver/mysql v1.6.0
+	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/fiber/v2 v2.39.0
 	github.com/google/uuid v1.3.0
 	github.com/jmoiron/sqlx v1.3.5

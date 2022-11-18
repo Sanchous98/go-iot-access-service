@@ -8,6 +8,7 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/services"
 	"github.com/Sanchous98/go-di"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"log"
@@ -46,7 +47,7 @@ func bootstrap(container di.GlobalState) {
 	//	mqtt.DEBUG = log.New(os.Stdout, "[mqtt:DEBUG]::", log.LUTC)
 	//}
 
-	profiler := fiber.New()
+	profiler := fiber.New(fiber.Config{JSONDecoder: json.Unmarshal, JSONEncoder: json.Marshal})
 	profiler.Use(pprof.New())
 	log.Println(profiler.Listen(":6060"))
 }

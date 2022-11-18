@@ -3,9 +3,9 @@ package services
 import (
 	"bitbucket.org/4suites/iot-service-golang/messages"
 	"bitbucket.org/4suites/iot-service-golang/models"
-	"encoding/json"
 	"errors"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/goccy/go-json"
 	"time"
 )
 
