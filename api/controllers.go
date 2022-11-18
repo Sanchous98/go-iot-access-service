@@ -9,10 +9,17 @@ import (
 	"github.com/jmoiron/sqlx"
 	"log"
 	"strconv"
+	"sync"
 )
+
+var cache sync.Map
 
 // TODO: Remove after demo
 func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
+	if item, hit := cache.Load(deviceCoreId); hit {
+		return item.(string)
+	}
+
 	db, err := sqlx.Open("mysql", di.Application().GetParam("DATABASE_DSN"))
 	if err != nil {
 		log.Println(err)
