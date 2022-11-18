@@ -12,7 +12,5 @@ type Handler struct {
 }
 
 func (h *Handler) Constructor() {
-	h.server.Post("/devices/:deviceId/open", Open(h.service, h.repository))
-	h.server.Post("/devices/:deviceId/close", Close(h.service, h.repository))
-	h.server.Post("/devices/:deviceId/auto", Auto(h.service, h.repository))
+	h.server.Post("/devices/:deviceId/:action", Action(h.service, h.repository))
 }

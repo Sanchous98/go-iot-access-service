@@ -14,6 +14,11 @@ import (
 
 var cache sync.Map
 
+type responseShape struct {
+	RecloseDelay uint8 `json:"recloseDelay,omitempty"`
+	ChannelsIds  []int `json:"channelIds,omitempty"`
+}
+
 // TODO: Remove after demo
 func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
 	if item, hit := cache.Load(deviceCoreId); hit {
@@ -41,84 +46,8 @@ func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
 	return macId[0]
 }
 
-// Open POST: /devices/:deviceId/open
-func Open(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
-	type responseShape struct {
-		ChannelsIds []int `json:"channelIds"`
-	}
-
-	return func(ctx *fiber.Ctx) error {
-		var deviceId string
-		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
-
-		if err == nil {
-			deviceId = convertCoreApiIdToRegistryMacId(coreDeviceId)
-		} else {
-			deviceId = ctx.Params("deviceId", "")
-		}
-
-		device := repository.FindByMacId(deviceId)
-
-		if device == nil {
-			return fiber.ErrNotFound
-		}
-
-		var body responseShape
-
-		err = ctx.BodyParser(&body)
-		if err != nil {
-			log.Println(err)
-			return fiber.ErrUnprocessableEntity
-		}
-
-		err = service.OpenSync(device, body.ChannelsIds)
-		if err != nil {
-			log.Println(err)
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
-		}
-
-		ctx.Status(200)
-		return ctx.JSON(map[string]int{"status": 200})
-	}
-}
-
-// Close POST: /devices/:deviceId/close
-func Close(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
-	return func(ctx *fiber.Ctx) error {
-		var deviceId string
-		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
-
-		if err == nil {
-			deviceId = convertCoreApiIdToRegistryMacId(coreDeviceId)
-		} else {
-			log.Println(err)
-			deviceId = ctx.Params("deviceId", "")
-		}
-
-		device := repository.FindByMacId(deviceId)
-
-		if device == nil {
-			return fiber.ErrNotFound
-		}
-
-		err = service.CloseSync(device)
-		if err != nil {
-			log.Println(err)
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
-		}
-
-		ctx.Status(200)
-		return ctx.JSON(map[string]int{"status": 200})
-	}
-}
-
-// Auto POST: /devices/:deviceId/auto
-func Auto(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
-	type responseShape struct {
-		RecloseDelay uint8 `json:"recloseDelay"`
-		ChannelsIds  []int `json:"channelIds"`
-	}
-
+// Action => POST /devices/:deviceId/:action
+func Action(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		var deviceId string
 		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
@@ -144,7 +73,15 @@ func Auto(service services.DeviceService, repository *repositories.DeviceReposit
 			return fiber.ErrUnprocessableEntity
 		}
 
-		err = service.AutoSync(device, body.RecloseDelay, body.ChannelsIds)
+		switch ctx.Params("action") {
+		case "open":
+			err = service.OpenSync(device, body.ChannelsIds)
+		case "close":
+			err = service.CloseSync(device)
+		case "auto":
+			err = service.AutoSync(device, body.RecloseDelay, body.ChannelsIds)
+		}
+
 		if err != nil {
 			log.Println(err)
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
