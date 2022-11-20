@@ -5,12 +5,12 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/models"
 	"bitbucket.org/4suites/iot-service-golang/repositories"
 	"bitbucket.org/4suites/iot-service-golang/services"
-	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +25,7 @@ type VerifyOnlineHandler struct {
 	coreApiBaseUrl    string                         `env:"CORE_API_SERVICE_URL"`
 	coreApiKey        string                         `env:"CORE_API_SERVICE_ACCESS_TOKEN"`
 	deviceService     *services.DeviceService        `inject:""`
+	client            *fiber.Client
 }
 
 func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, hashKey string, authTypes messages.AuthType) *authorizationResponsePayload {
@@ -34,26 +35,35 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 		authTypeParam = 1
 	}
 
-	body, _ := json.Marshal(map[string]any{
+	body, _ := json.MarshalNoEscape(map[string]any{
 		"device_mac_id":  deviceMacId,
 		"gateway_mac_id": gatewayMacId,
 		"qr_crc_hash":    hashKey,
 		"auth_type":      authTypeParam,
 	})
 
-	client := fiber.AcquireClient()
-	defer fiber.ReleaseClient(client)
+	arg := fiber.AcquireArgs()
+	defer fiber.ReleaseArgs(arg)
 
-	agent := client.Post(h.coreApiBaseUrl+"/qr-codes/qr-scan").
+	arg.Set("device_mac_id", deviceMacId)
+	arg.Set("gateway_mac_id", gatewayMacId)
+	arg.Set("qr_crc_hash", hashKey)
+	arg.Set("auth_type", strconv.Itoa(authTypeParam))
+
+	agent := h.client.Post(h.coreApiBaseUrl+"/qr-codes/qr-scan").
 		Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON).
 		Add(fiber.HeaderAuthorization, "Bearer "+h.coreApiKey).
-		Body(body)
-	defer fiber.ReleaseAgent(agent)
+		Form(arg)
 
 	code, body, errors := agent.Bytes()
 
-	if len(errors) != 0 || code >= 400 {
+	if len(errors) != 0 {
 		log.Println(errors)
+		return nil
+	}
+
+	if code >= 400 {
+		log.Println(body)
 		return nil
 	}
 
@@ -61,23 +71,26 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 		Data *authorizationResponsePayload `json:"data"`
 	}{}
 
-	_ = json.Unmarshal(body, &responseData)
+	_ = json.UnmarshalNoEscape(body, &responseData)
 
 	return responseData.Data
 }
 
 func (h *VerifyOnlineHandler) Constructor() {
 	h.regexp = regexp.MustCompile(`^\$foursuites/gw/(.+)/dev/(.+)/events$`)
+	h.client = fiber.AcquireClient()
 }
 
 func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
-	var p messages.EventRequest[messages.Auth]
+	var p messages.Response[messages.Auth]
 	_ = json.Unmarshal(message.Payload(), &p)
+	log.Println(string(message.Payload()))
 
-	p.Event.Payload.HashKey = strings.TrimPrefix(p.Event.Payload.HashKey, "0x")
+	p.Payload.HashKey = strings.TrimPrefix(p.Payload.HashKey, "0x")
 
-	var gatewayMacId, deviceMacId string
-	_, _ = fmt.Sscanf(message.Topic(), "$foursuites/gw/%s/dev/%s/events", &gatewayMacId, &deviceMacId)
+	res := h.regexp.FindStringSubmatch(message.Topic())
+	gatewayMacId := res[1]
+	deviceMacId := res[2]
 	device := h.deviceRepository.FindByMacId(deviceMacId)
 
 	if device == nil {
@@ -86,12 +99,12 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 
 	gateway := h.gatewayRepository.FindByMacId(gatewayMacId)
 	device.GatewayResolver = func() *models.Gateway { return gateway }
-	response := h.authorizationRequest(deviceMacId, gatewayMacId, p.Event.Payload.HashKey, p.Event.Payload.AuthType)
+	response := h.authorizationRequest(deviceMacId, gatewayMacId, p.Payload.HashKey, p.Payload.AuthType)
 
-	if len(response.AccessibleChannels) == 0 {
+	if response == nil || response.AccessibleChannels == nil || len(response.AccessibleChannels) == 0 {
 		err := h.deviceService.DenyKeyAccessSync(device, 0, map[string]any{
-			"hashKey":  p.Event.Payload.HashKey,
-			"authType": p.Event.Payload.AuthType,
+			"hashKey":  p.Payload.HashKey,
+			"authType": p.Payload.AuthType,
 		})
 
 		if err != nil {
@@ -102,8 +115,8 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 	}
 
 	err := h.deviceService.AllowKeyAccessSync(device, 0, map[string]any{
-		"hashKey":    p.Event.Payload.HashKey,
-		"authType":   p.Event.Payload.AuthType,
+		"hashKey":    p.Payload.HashKey,
+		"authType":   p.Payload.AuthType,
 		"channelIds": response.AccessibleChannels,
 	})
 
@@ -113,7 +126,7 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 }
 
 func (h *VerifyOnlineHandler) CanHandle(_ mqtt.Client, message mqtt.Message) bool {
-	var p messages.EventRequest[messages.Auth]
+	var p messages.Response[messages.Auth]
 	err := json.Unmarshal(message.Payload(), &p)
-	return err == nil && h.regexp.MatchString(message.Topic()) && p.Event.Payload.AuthStatus == "verifyOnline"
+	return err == nil && h.regexp.MatchString(message.Topic()) && p.Payload.AuthStatus == messages.VerifyOnlineStatus
 }

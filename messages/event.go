@@ -5,7 +5,7 @@ type EventType string
 type EmptyPayload struct{}
 
 type EventRequestPayloads interface {
-	DeviceConfig | EmptyPayload | LockAuto | LocalStorageUpdateKeys | LocalStorageReadKeys | LocalStorageDeleteKeys | Auth
+	DeviceConfig | EmptyPayload | LockAuto | LocalStorageEvent | Auth
 }
 
 type EventRequest[T EventRequestPayloads] struct {
@@ -25,4 +25,13 @@ type EventResponse[T LockResponse | DeviceStatusResponsePayload] struct {
 		Payload   T         `json:"payload"`
 	} `json:"event"`
 	TransactionId int `json:"transactionId"`
+}
+
+type Response[T Auth] struct {
+	ShortAddr     string    `json:"short_addr"`
+	ExtAddr       string    `json:"ext_addr"`
+	Rssi          int       `json:"rssi"`
+	EventType     EventType `json:"eventType"`
+	Payload       T         `json:"payload"`
+	TransactionId int       `json:"transactionId"`
 }

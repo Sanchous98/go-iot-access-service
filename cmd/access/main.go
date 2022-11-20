@@ -16,9 +16,22 @@ import (
 )
 
 func main() {
+	for {
+		launch()
+	}
+}
+
+func launch() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("%v", err)
+		}
+	}()
+
 	app := di.Application()
 	app.AddEntryPoint(bootstrap)
 
+	app.Set(new(api.ServerApi))
 	app.Set(new(api.Handler))
 	app.Set(func(container di.Container) repositories.Repository[*models.Gateway] {
 		return container.Build(new(repositories.GatewayRepository)).(*repositories.GatewayRepository)
@@ -32,7 +45,7 @@ func main() {
 	app.Set(new(services.HandlerAggregator[*models.Gateway]))
 	app.Set(new(handlers.VerifyOnlineHandler), "mqtt.message_handler")
 	//app.Set(new(handlers.LogHandler), "mqtt.message_handler")
-	app.Run(true)
+	app.Run(app.LoadEnv, nil)
 }
 
 func bootstrap(container di.GlobalState) {
@@ -47,7 +60,10 @@ func bootstrap(container di.GlobalState) {
 	//	mqtt.DEBUG = log.New(os.Stdout, "[mqtt:DEBUG]::", log.LUTC)
 	//}
 
-	profiler := fiber.New(fiber.Config{JSONDecoder: json.Unmarshal, JSONEncoder: json.Marshal})
+	profiler := fiber.New(fiber.Config{
+		JSONDecoder: func(data []byte, v any) error { return json.UnmarshalNoEscape(data, v) },
+		JSONEncoder: func(v any) ([]byte, error) { return json.MarshalNoEscape(v) },
+	})
 	profiler.Use(pprof.New())
 	log.Println(profiler.Listen(":6060"))
 }

@@ -1,15 +1,15 @@
 package models
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/utils"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 )
 
 type Device struct {
-	Id utils.UUID `json:"id"`
-	//UserId             utils.UUID `json:"userId"`
-	GatewayId utils.UUID `json:"gatewayId"`
+	Id uuid.UUID `json:"id"`
+	//UserId             uuid.UUID `json:"userId"`
+	GatewayId uuid.UUID `json:"gatewayId"`
 	//TypeId             string     `json:"typeId"`
 	//FirmwareId         string     `json:"firmwareId"`
 	//Version            string     `json:"version"`

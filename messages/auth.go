@@ -1,7 +1,5 @@
 package messages
 
-import "time"
-
 const AuthEvent EventType = "authEvent"
 
 const (
@@ -31,7 +29,7 @@ type AuthType string
 
 type Auth struct {
 	HashKey    string     `json:"hashKey"`
-	Timestamp  time.Time  `json:"timestamp"`
+	Timestamp  int        `json:"timestamp"`
 	AuthType   AuthType   `json:"authType"`
 	AuthStatus AuthStatus `json:"authStatus"`
 	ChannelIds []int      `json:"channelIds,omitempty"`

@@ -1,10 +1,10 @@
 package repositories
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/utils"
 	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"log"
 	"strings"
 )
@@ -14,7 +14,7 @@ type WithEndpoint interface {
 }
 
 type Repository[T WithEndpoint] interface {
-	Find(id utils.UUID) T
+	Find(id uuid.UUID) T
 	FindAll() []T
 }
 
@@ -38,12 +38,13 @@ func (r *RegistryRepository[T]) GetUrl() string {
 	return r.ApiBaseUrl + model.GetEndpoint()
 }
 
-func (r *RegistryRepository[T]) Find(id utils.UUID) (result T) {
+func (r *RegistryRepository[T]) Find(id uuid.UUID) (result T) {
 	return r.find(id)
 }
 
-func (r *RegistryRepository[T]) find(id utils.UUID) T {
-	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.GetUrl(), id.String(), r.ApiKey)).Add("Accept", "application/json")
+func (r *RegistryRepository[T]) find(id uuid.UUID) T {
+	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.GetUrl(), id.String(), r.ApiKey)).
+		Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	code, body, errors := agent.Bytes()
 
 	if len(errors) != 0 {
@@ -57,7 +58,7 @@ func (r *RegistryRepository[T]) find(id utils.UUID) T {
 	responseBody := struct {
 		Data T `json:"data"`
 	}{}
-	_ = json.Unmarshal(body, &responseBody)
+	_ = json.UnmarshalNoEscape(body, &responseBody)
 
 	return responseBody.Data
 }
@@ -79,7 +80,7 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 		}
 	}
 
-	agent := r.client.Get(builder.String()).Add("Accept", "application/json")
+	agent := r.client.Get(builder.String()).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	code, body, errors := agent.Bytes()
 
 	if len(errors) != 0 {
@@ -93,7 +94,7 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 	responseBody := struct {
 		Data []T `json:"data"`
 	}{}
-	_ = json.Unmarshal(body, &responseBody)
+	_ = json.UnmarshalNoEscape(body, &responseBody)
 
 	return responseBody.Data
 }

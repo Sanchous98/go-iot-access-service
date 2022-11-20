@@ -2,14 +2,14 @@ package services
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/repositories"
-	"bitbucket.org/4suites/iot-service-golang/utils"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 	"sync"
 	"unsafe"
 )
 
 type Connectable interface {
-	GetId() utils.UUID
+	GetId() uuid.UUID
 	GetOptions() *mqtt.ClientOptions
 	GetTopics() map[string]byte
 }
@@ -32,20 +32,25 @@ type Aggregatable interface {
 type HandlerAggregator[T Aggregatable] struct {
 	registeredHandlers []Handler                  `inject:"mqtt.message_handler"`
 	repository         repositories.Repository[T] `inject:""`
+	mu                 sync.Mutex
 
 	clients sync.Map
 }
 
 func (a *HandlerAggregator[T]) Register(handlers ...Handler) {
+	a.mu.Lock()
 	a.registeredHandlers = append(a.registeredHandlers, handlers...)
+	a.mu.Unlock()
 }
 
 func (a *HandlerAggregator[T]) Unregister(handler Handler) {
+	a.mu.Lock()
 	for index, h := range a.registeredHandlers {
-		if (*(*[2]uintptr)(unsafe.Pointer(&handler)))[1] == (*(*[2]uintptr)(unsafe.Pointer(&h)))[1] {
+		if sameHandler(handler, h) {
 			a.registeredHandlers = append(a.registeredHandlers[:index], a.registeredHandlers[index+1:]...)
 		}
 	}
+	a.mu.Unlock()
 }
 
 func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan mqtt.Token {
@@ -68,11 +73,13 @@ func (a *HandlerAggregator[T]) Launch() {
 	for _, item := range items {
 		go func(item T) {
 			client := a.Subscribe(item.GetTopics(), item.GetOptions(), func(client mqtt.Client, message mqtt.Message) {
+				a.mu.Lock()
 				for _, handler := range a.registeredHandlers {
 					if handler.CanHandle(client, message) {
-						go handler.Handle(client, message)
+						handler.Handle(client, message)
 					}
 				}
+				a.mu.Unlock()
 			})
 
 			a.clients.Store(item.GetId(), client)
@@ -107,4 +114,8 @@ func (a *HandlerAggregator[T]) Shutdown() {
 		go client.(mqtt.Client).Disconnect(250)
 		return true
 	})
+}
+
+func sameHandler(handler1, handler2 Handler) bool {
+	return (*(*[2]uintptr)(unsafe.Pointer(&handler1)))[1] == (*(*[2]uintptr)(unsafe.Pointer(&handler2)))[1]
 }

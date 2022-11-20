@@ -1,19 +1,19 @@
 package models
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/utils"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 )
 
 type Gateway struct {
-	Id utils.UUID `json:"id"`
+	Id uuid.UUID `json:"id"`
 	//PublicId                   string         `json:"publicId"`
 	//Version                    string         `json:"version"`
 	//Channel                    int            `json:"channel"`
 	//NetworkKey                 string         `json:"networkKey"`
-	//UserId                     utils.UUID     `json:"userId"`
-	BrokerId utils.UUID `json:"brokerId"`
+	//UserId                     uuid.UUID     `json:"userId"`
+	BrokerId uuid.UUID `json:"brokerId"`
 	//SerialNumber               string         `json:"serialNumber"`
 	//PanId                      string         `json:"panId"`
 	//Hostname                   string         `json:"hostname"`
@@ -33,7 +33,7 @@ type Gateway struct {
 	BrokerResolver func() *Broker
 }
 
-func (g *Gateway) GetId() utils.UUID { return g.Id }
+func (g *Gateway) GetId() uuid.UUID { return g.Id }
 func (g *Gateway) GetTopics() map[string]byte {
 	return map[string]byte{
 		fmt.Sprintf("$foursuites/gw/%s/info", g.GatewayIeee):          0,

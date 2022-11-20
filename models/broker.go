@@ -5,12 +5,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 	"time"
 )
 
 type Broker struct {
-	Id utils.UUID `json:"id"`
-	//UserId            utils.UUID     `json:"userId"`
+	Id uuid.UUID `json:"id"`
+	//UserId            uuid.UUID     `json:"userId"`
 	//Name              string         `json:"name"`
 	Host string `json:"host"`
 	Port int    `json:"port"`
@@ -25,7 +26,7 @@ type Broker struct {
 	//UpdatedAt         time.Time      `json:"updatedAt"`
 }
 
-func (b *Broker) GetId() utils.UUID          { return b.Id }
+func (b *Broker) GetId() uuid.UUID           { return b.Id }
 func (b *Broker) GetTopics() map[string]byte { return map[string]byte{"$aws/#": 0} }
 func (b *Broker) GetOptions() *mqtt.ClientOptions {
 	cert, _ := tls.X509KeyPair(utils.StrToBytes(b.ClientCertificate), utils.StrToBytes(b.ClientKey))

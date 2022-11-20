@@ -1,5 +1,6 @@
 services:
   access:
+    command: "go run ./cmd/access/main.go"
     environment:
       - APP_ENV=prod
   iot:

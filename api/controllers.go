@@ -3,75 +3,28 @@ package api
 import (
 	"bitbucket.org/4suites/iot-service-golang/repositories"
 	"bitbucket.org/4suites/iot-service-golang/services"
-	"github.com/Sanchous98/go-di"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jmoiron/sqlx"
 	"log"
-	"strconv"
-	"sync"
 )
 
-var cache sync.Map
-var db *sqlx.DB
-
-type responseShape struct {
+type requestShape struct {
 	RecloseDelay uint8 `json:"recloseDelay,omitempty"`
 	ChannelsIds  []int `json:"channelIds,omitempty"`
-}
-
-// TODO: Remove after demo
-func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
-	if item, hit := cache.Load(deviceCoreId); hit {
-		return item.(string)
-	}
-
-	var err error
-
-	if db == nil {
-		db, err = sqlx.Open("mysql", di.Application().GetParam("DATABASE_DSN"))
-		if err != nil {
-			log.Println(err)
-			return ""
-		}
-	}
-
-	var macId []string
-	err = db.Select(&macId, "SELECT mac_id FROM devices WHERE id = ?", deviceCoreId)
-	if err != nil {
-		log.Println(err)
-		return ""
-	}
-
-	if len(macId) == 0 {
-		return ""
-	}
-
-	return macId[0]
 }
 
 // Action => POST /devices/:deviceId/:action
 func Action(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
-		var deviceId string
-		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
-
-		if err == nil {
-			deviceId = convertCoreApiIdToRegistryMacId(coreDeviceId)
-		} else {
-			log.Println(err)
-			deviceId = ctx.Params("deviceId", "")
-		}
-
-		device := repository.FindByMacId(deviceId)
+		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
 			return fiber.ErrNotFound
 		}
 
-		var body responseShape
+		var body requestShape
 
-		err = ctx.BodyParser(&body)
+		err := ctx.BodyParser(&body)
 		if err != nil {
 			log.Println(err)
 			return fiber.ErrUnprocessableEntity
@@ -88,10 +41,14 @@ func Action(service services.DeviceService, repository *repositories.DeviceRepos
 
 		if err != nil {
 			log.Println(err)
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+
+			if _, ok := err.(*fiber.Error); ok {
+				return err
+			}
+
+			return fiber.ErrInternalServerError
 		}
 
-		ctx.Status(200)
-		return ctx.JSON(map[string]int{"status": 200})
+		return ctx.Status(200).JSON(fiber.Map{"status": 200})
 	}
 }

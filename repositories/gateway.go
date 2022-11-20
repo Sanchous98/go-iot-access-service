@@ -3,7 +3,7 @@ package repositories
 import (
 	"bitbucket.org/4suites/iot-service-golang/cache"
 	"bitbucket.org/4suites/iot-service-golang/models"
-	"bitbucket.org/4suites/iot-service-golang/utils"
+	"github.com/google/uuid"
 )
 
 type GatewayRepository struct {
@@ -12,7 +12,7 @@ type GatewayRepository struct {
 	cache                                cache.Cache[*models.Gateway]
 }
 
-func (r *GatewayRepository) Find(id utils.UUID) *models.Gateway {
+func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 	if item, hit := r.cache.Get(func(g *models.Gateway) bool { return g.Id == id }); hit {
 		return item
 	}
@@ -24,7 +24,7 @@ func (r *GatewayRepository) Find(id utils.UUID) *models.Gateway {
 	}
 
 	gateway.BrokerResolver = func() *models.Broker {
-		return r.BrokerRepository.Find(gateway.BrokerId.String())
+		return r.BrokerRepository.Find(gateway.BrokerId)
 	}
 	return gateway
 }
@@ -42,7 +42,7 @@ func (r *GatewayRepository) FindByMacId(macId string) *models.Gateway {
 
 	item := gateways[0]
 	item.BrokerResolver = func() *models.Broker {
-		return r.BrokerRepository.Find(item.BrokerId.String())
+		return r.BrokerRepository.Find(item.BrokerId)
 	}
 
 	return item
@@ -59,7 +59,7 @@ func (r *GatewayRepository) FindAll() []*models.Gateway {
 
 	for _, gateway := range gateways {
 		gateway.BrokerResolver = func() *models.Broker {
-			return r.BrokerRepository.Find(gateway.BrokerId.String())
+			return r.BrokerRepository.Find(gateway.BrokerId)
 		}
 	}
 
