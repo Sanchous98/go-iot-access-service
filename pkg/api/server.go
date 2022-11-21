@@ -1,6 +1,9 @@
 package api
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"context"
+	"github.com/gofiber/fiber/v2"
+)
 
 type ServerApi struct {
 	*fiber.App
@@ -12,6 +15,10 @@ func (s *ServerApi) Constructor() {
 	s.App = fiber.New()
 }
 
-func (s *ServerApi) Launch() {
+func (s *ServerApi) Launch(context context.Context) {
+	s.App.Use(func(ctx *fiber.Ctx) error {
+		ctx.SetUserContext(context)
+		return ctx.Next()
+	})
 	_ = s.Listen(s.host + ":" + s.port)
 }

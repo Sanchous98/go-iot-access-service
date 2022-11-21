@@ -1,7 +1,7 @@
 package models
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/utils"
+	"bitbucket.org/4suites/iot-service-golang/pkg/utils"
 	"crypto/tls"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"

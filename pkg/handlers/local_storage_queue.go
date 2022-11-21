@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/messages"
-	"bitbucket.org/4suites/iot-service-golang/models"
+	"bitbucket.org/4suites/iot-service-golang/pkg/messages"
+	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"

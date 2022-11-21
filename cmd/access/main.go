@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/api"
-	"bitbucket.org/4suites/iot-service-golang/handlers"
-	"bitbucket.org/4suites/iot-service-golang/models"
-	"bitbucket.org/4suites/iot-service-golang/repositories"
-	"bitbucket.org/4suites/iot-service-golang/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/api"
+	"bitbucket.org/4suites/iot-service-golang/pkg/handlers"
+	"bitbucket.org/4suites/iot-service-golang/pkg/models"
+	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
+	"bitbucket.org/4suites/iot-service-golang/pkg/services"
+	"context"
 	"github.com/Sanchous98/go-di"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
@@ -22,13 +23,16 @@ func main() {
 }
 
 func launch() {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("%v", err)
+			cancel()
 		}
 	}()
 
-	app := di.Application()
+	app := di.Application(ctx)
 	app.AddEntryPoint(bootstrap)
 
 	app.Set(new(api.ServerApi))
@@ -45,7 +49,7 @@ func launch() {
 	app.Set(new(services.HandlerAggregator[*models.Gateway]))
 	app.Set(new(handlers.VerifyOnlineHandler), "mqtt.message_handler")
 	//app.Set(new(handlers.LogHandler), "mqtt.message_handler")
-	app.Run(app.LoadEnv, nil)
+	app.Run(app.LoadEnv)
 }
 
 func bootstrap(container di.GlobalState) {

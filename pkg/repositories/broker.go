@@ -1,14 +1,15 @@
 package repositories
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/cache"
-	"bitbucket.org/4suites/iot-service-golang/models"
+	"bitbucket.org/4suites/iot-service-golang/pkg/cache"
+	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"github.com/google/uuid"
 )
 
 type BrokerRepository struct {
 	*RegistryRepository[*models.Broker] `inject:""`
-	cache                               cache.Cache[*models.Broker]
+
+	cache cache.Cache[*models.Broker]
 }
 
 func (r *BrokerRepository) Find(id uuid.UUID) *models.Broker {

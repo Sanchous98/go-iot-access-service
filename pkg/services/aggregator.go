@@ -1,7 +1,8 @@
 package services
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/repositories"
+	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
+	"context"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 	"sync"
@@ -67,7 +68,7 @@ func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan
 	return nil
 }
 
-func (a *HandlerAggregator[T]) Launch() {
+func (a *HandlerAggregator[T]) Launch(ctx context.Context) {
 	items := a.repository.FindAll()
 
 	for _, item := range items {
@@ -109,7 +110,7 @@ func (a *HandlerAggregator[T]) Unsubscribe(client mqtt.Client, topics map[string
 	}
 }
 
-func (a *HandlerAggregator[T]) Shutdown() {
+func (a *HandlerAggregator[T]) Shutdown(ctx context.Context) {
 	a.clients.Range(func(_, client any) bool {
 		go client.(mqtt.Client).Disconnect(250)
 		return true

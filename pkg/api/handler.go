@@ -1,11 +1,11 @@
 package api
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/repositories"
-	"bitbucket.org/4suites/iot-service-golang/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
+	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	"database/sql"
 	"errors"
-	"github.com/Sanchous98/go-di"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/goccy/go-reflect"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jmoiron/sqlx"
@@ -15,24 +15,32 @@ import (
 	"unsafe"
 )
 
+var cache sync.Map
+var db *sqlx.DB
+
 type Handler struct {
-	service    services.DeviceService         `inject:""`
-	repository *repositories.DeviceRepository `inject:""`
-	server     *ServerApi                     `inject:""`
+	service     services.DeviceService         `inject:""`
+	repository  *repositories.DeviceRepository `inject:""`
+	server      *ServerApi                     `inject:""`
+	databaseDsn string                         `env:"DATABASE_DSN"`
 }
 
 func (h *Handler) Constructor() {
+	if db == nil {
+		var err error
+		db, err = sqlx.Open("mysql", h.databaseDsn)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	h.server.Post(
 		"/devices/:deviceId/:action",
 		checkPath,
 		convertCoreDeviceIdToRegistryMac,
 		Action(h.service, h.repository),
 	)
-
 }
-
-var cache sync.Map
-var db *sqlx.DB
 
 // TODO: Remove after demo
 func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
@@ -41,14 +49,6 @@ func convertCoreApiIdToRegistryMacId(deviceCoreId int) string {
 	}
 
 	var macId []string
-
-	if db == nil {
-		var err error
-		db, err = sqlx.Open("mysql", di.Application().GetParam("DATABASE_DSN"))
-		if err != nil {
-			panic(err)
-		}
-	}
 
 	if err := db.Select(&macId, "SELECT mac_id FROM devices WHERE id = ?", deviceCoreId); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {

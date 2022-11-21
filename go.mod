@@ -3,7 +3,7 @@ module bitbucket.org/4suites/iot-service-golang
 go 1.18
 
 require (
-	github.com/Sanchous98/go-di v1.4.3
+	github.com/Sanchous98/go-di v1.5.0
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/goccy/go-json v0.9.11

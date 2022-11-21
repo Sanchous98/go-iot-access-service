@@ -1,5 +1,5 @@
-github.com/Sanchous98/go-di v1.4.3 h1:nW4skWimQqlgsx7EFSKa4mwjJ8Dui0UrrMMejP/1eJY=
-github.com/Sanchous98/go-di v1.4.3/go.mod h1:+8100ekB02xaVy7z0xD8xn9wgcRWjAYojH1HGlH3JKE=
+github.com/Sanchous98/go-di v1.5.0 h1:xL3wW+r6BOljjWeTCIOldSLiUSCXRRmkQWBJCPudsu4=
+github.com/Sanchous98/go-di v1.5.0/go.mod h1:+8100ekB02xaVy7z0xD8xn9wgcRWjAYojH1HGlH3JKE=
 github.com/andybalholm/brotli v1.0.4 h1:V7DdXeJtZscaqfNuAdSRuRFzuiKlHSC/Zh3zl9qY3JY=
 github.com/andybalholm/brotli v1.0.4/go.mod h1:fO7iG3H7G2nSZ7m0zPUDn85XEX2GTukHGRSepvi9Eig=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

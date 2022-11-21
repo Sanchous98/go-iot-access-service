@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/messages"
-	"bitbucket.org/4suites/iot-service-golang/models"
-	"bitbucket.org/4suites/iot-service-golang/repositories"
-	"bitbucket.org/4suites/iot-service-golang/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/messages"
+	"bitbucket.org/4suites/iot-service-golang/pkg/models"
+	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
+	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -34,13 +34,6 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 	if authTypes != messages.NfcType {
 		authTypeParam = 1
 	}
-
-	body, _ := json.MarshalNoEscape(map[string]any{
-		"device_mac_id":  deviceMacId,
-		"gateway_mac_id": gatewayMacId,
-		"qr_crc_hash":    hashKey,
-		"auth_type":      authTypeParam,
-	})
 
 	arg := fiber.AcquireArgs()
 	defer fiber.ReleaseArgs(arg)
