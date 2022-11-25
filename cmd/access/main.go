@@ -9,20 +9,20 @@ import (
 	"context"
 	"github.com/Sanchous98/go-di"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/v3/store"
+	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"log"
 	"os"
+	"strconv"
 )
 
 func main() {
-	for {
-		launch()
-	}
-}
-
-func launch() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer func() {
@@ -37,6 +37,39 @@ func launch() {
 
 	app.Set(new(api.ServerApi))
 	app.Set(new(api.Handler))
+	app.Set(func(environment di.GlobalState) *gorm.DB {
+		db, err := gorm.Open(mysql.Open(environment.GetParam("DATABASE_DSN")))
+
+		if err != nil {
+			panic(err)
+		}
+
+		return db
+	})
+
+	app.Set(func(environment di.GlobalState) store.StoreInterface {
+		db, err := strconv.Atoi(environment.GetParam("REDIS_DB"))
+
+		if err != nil {
+			panic(err)
+		}
+
+		return store.NewRedis(redis.NewClient(&redis.Options{
+			Addr: environment.GetParam("REDIS_HOST"),
+			DB:   db,
+		}))
+	})
+
+	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Broker] {
+		return cache.New[*models.Broker](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	})
+	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Device] {
+		return cache.New[*models.Device](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	})
+	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Gateway] {
+		return cache.New[*models.Gateway](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	})
+
 	app.Set(func(container di.Container) repositories.Repository[*models.Gateway] {
 		return container.Build(new(repositories.GatewayRepository)).(*repositories.GatewayRepository)
 	})

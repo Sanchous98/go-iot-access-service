@@ -1,11 +1,16 @@
 services:
   access:
+    image: golang:alpine
     command: "go run ./cmd/access/main.go"
     environment:
       - APP_ENV=prod
   iot:
+    image: golang:alpine
+    command: "go run ./cmd/iot/main.go"
     environment:
       - APP_ENV=prod
   upgrade:
+    image: golang:alpine
+    command: "go run ./cmd/upgrade/main.go"
     environment:
       - APP_ENV=prod

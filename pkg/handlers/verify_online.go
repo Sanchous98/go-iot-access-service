@@ -36,7 +36,6 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 	}
 
 	arg := fiber.AcquireArgs()
-	defer fiber.ReleaseArgs(arg)
 
 	arg.Set("device_mac_id", deviceMacId)
 	arg.Set("gateway_mac_id", gatewayMacId)
@@ -49,6 +48,7 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 		Form(arg)
 
 	code, body, errors := agent.Bytes()
+	fiber.ReleaseArgs(arg)
 
 	if len(errors) != 0 {
 		log.Println(errors)
@@ -76,8 +76,7 @@ func (h *VerifyOnlineHandler) Constructor() {
 
 func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 	var p messages.Response[messages.Auth]
-	_ = json.Unmarshal(message.Payload(), &p)
-	log.Println(string(message.Payload()))
+	_ = json.UnmarshalNoEscape(message.Payload(), &p)
 
 	p.Payload.HashKey = strings.TrimPrefix(p.Payload.HashKey, "0x")
 
@@ -120,6 +119,6 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 
 func (h *VerifyOnlineHandler) CanHandle(_ mqtt.Client, message mqtt.Message) bool {
 	var p messages.Response[messages.Auth]
-	err := json.Unmarshal(message.Payload(), &p)
+	err := json.UnmarshalNoEscape(message.Payload(), &p)
 	return err == nil && h.regexp.MatchString(message.Topic()) && p.Payload.AuthStatus == messages.VerifyOnlineStatus
 }

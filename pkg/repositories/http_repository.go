@@ -9,16 +9,29 @@ import (
 	"strings"
 )
 
-type WithEndpoint interface {
-	GetEndpoint() string
+type meta struct {
+	//Locale     string `json:"locale"`
+	//Version    int    `json:"version"`
+	Pagination struct {
+		Total int `json:"total"`
+		//Count       int `json:"count"`
+		Limit       int `json:"limit"`
+		CurrentPage int `json:"currentPage"`
+		TotalPages  int `json:"totalPages"`
+	} `json:"pagination"`
 }
 
-type Repository[T WithEndpoint] interface {
-	Find(id uuid.UUID) T
-	FindAll() []T
+type responseFindShape[T WithResource] struct {
+	Data T    `json:"data"`
+	Meta meta `json:"meta"`
 }
 
-type RegistryRepository[T WithEndpoint] struct {
+type responseFindAllShape[T WithResource] struct {
+	Data []T  `json:"data"`
+	Meta meta `json:"meta"`
+}
+
+type RegistryRepository[T WithResource] struct {
 	ApiBaseUrl string `env:"REGISTRY_API_URL"`
 	ApiKey     string `env:"REGISTRY_API_KEY"`
 	client     *fiber.Client
@@ -34,12 +47,8 @@ func (r *RegistryRepository[T]) Destructor() {
 }
 
 func (r *RegistryRepository[T]) GetUrl() string {
-	var model WithEndpoint = *new(T)
-	return r.ApiBaseUrl + model.GetEndpoint()
-}
-
-func (r *RegistryRepository[T]) Find(id uuid.UUID) (result T) {
-	return r.find(id)
+	var model WithResource = *new(T)
+	return r.ApiBaseUrl + "/" + strings.TrimPrefix(model.GetResource(), "/")
 }
 
 func (r *RegistryRepository[T]) find(id uuid.UUID) T {
@@ -55,19 +64,10 @@ func (r *RegistryRepository[T]) find(id uuid.UUID) T {
 		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
 	}
 
-	responseBody := struct {
-		Data T `json:"data"`
-	}{}
+	var responseBody responseFindShape[T]
 	_ = json.UnmarshalNoEscape(body, &responseBody)
 
 	return responseBody.Data
-}
-
-func (r *RegistryRepository[T]) FindAll() []T {
-	return r.findAll(map[string]any{
-		"enabled": 1,
-		"claimed": 1,
-	})
 }
 
 func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
@@ -80,7 +80,8 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 		}
 	}
 
-	agent := r.client.Get(builder.String()).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+	query := builder.String()
+	agent := r.client.Get(query).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	code, body, errors := agent.Bytes()
 
 	if len(errors) != 0 {
@@ -91,10 +92,24 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
 	}
 
-	responseBody := struct {
-		Data []T `json:"data"`
-	}{}
+	var responseBody responseFindAllShape[T]
 	_ = json.UnmarshalNoEscape(body, &responseBody)
 
-	return responseBody.Data
+	if responseBody.Meta.Pagination.Total <= responseBody.Meta.Pagination.Limit {
+		return responseBody.Data
+	}
+
+	result := make([]T, 0, responseBody.Meta.Pagination.Total)
+	result = append(result, responseBody.Data...)
+
+	for i := responseBody.Meta.Pagination.CurrentPage + 1; i <= responseBody.Meta.Pagination.TotalPages; i++ {
+		agent = r.client.Get(query+fmt.Sprintf("&page=%d", i)).
+			Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+		_, body, _ = agent.Bytes()
+
+		_ = json.UnmarshalNoEscape(body, &responseBody)
+		result = append(result, responseBody.Data...)
+	}
+
+	return result
 }

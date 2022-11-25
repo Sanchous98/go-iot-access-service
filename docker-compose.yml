@@ -1,11 +1,14 @@
 version: '3.7'
 
 services:
+  cache:
+    image: redis:latest
+
   access:
     container_name: go-iot-access-service
-    image: golang:alpine
+    build: .
     working_dir: /app
-    command: "go run -gcflags=\"-m -m\" ./cmd/access/main.go"
+    command: "go run -race -gcflags=\"-m -m\" ./cmd/access/main.go"
     environment:
       - APP_ENV=dev
     volumes:
@@ -14,15 +17,17 @@ services:
     ports:
       - "6060:6060"
       - "80:80"
+    depends_on:
+      - cache
     networks:
       4suites:
         aliases:
           - iot_access_service-app
   iot:
     container_name: go-iot-service-app
-    image: golang:alpine
+    build: .
     working_dir: /app
-    command: "go run ./cmd/iot/main.go"
+    command: "go run -race -gcflags=\"-m -m\" ./cmd/iot/main.go"
     environment:
       - APP_ENV=dev
     volumes:
@@ -34,9 +39,9 @@ services:
 
   upgrade:
     container_name: go-iot-upgrade-service-app
-    image: golang:alpine
+    build: .
     working_dir: /app
-    command: "go run ./cmd/upgrade/main.go"
+    command: "go run -race -gcflags=\"-m -m\" ./cmd/upgrade/main.go"
     environment:
       - APP_ENV=dev
     volumes:

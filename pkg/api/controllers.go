@@ -13,12 +13,12 @@ type requestShape struct {
 }
 
 // Action => POST /devices/:deviceId/:action
-func Action(service services.DeviceService, repository *repositories.DeviceRepository) fiber.Handler {
+func Action(service services.DeviceService, repository repositories.DeviceRepository) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
-		ctx.Context()
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
+			log.Printf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 

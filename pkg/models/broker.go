@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"time"
 )
@@ -42,4 +43,6 @@ func (b *Broker) GetOptions() *mqtt.ClientOptions {
 	return clientOptions
 }
 
-func (b *Broker) GetEndpoint() string { return "/brokers" }
+func (*Broker) GetResource() string                       { return "brokers" }
+func (b *Broker) UnmarshalBinary(data []byte) error       { return json.UnmarshalNoEscape(data, b) }
+func (b *Broker) MarshalBinary() (data []byte, err error) { return json.MarshalNoEscape(b) }

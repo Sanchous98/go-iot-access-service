@@ -27,7 +27,7 @@ func (h HandlerFunc) CanHandle(mqtt.Client, mqtt.Message) bool        { return t
 
 type Aggregatable interface {
 	Connectable
-	repositories.WithEndpoint
+	repositories.WithResource
 }
 
 type HandlerAggregator[T Aggregatable] struct {

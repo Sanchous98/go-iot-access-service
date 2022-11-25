@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +20,7 @@ type Device struct {
 	//CreatedAt          time.Time  `json:"createdAt"`
 	//UpdatedAt          time.Time  `json:"updatedAt"`
 
-	GatewayResolver func() *Gateway
+	GatewayResolver func() *Gateway `json:"-"`
 }
 
 func (d *Device) GetEventsTopic() string {
@@ -31,4 +32,7 @@ func (d *Device) GetCommandsTopic() string {
 }
 func (d *Device) GetOptions() *mqtt.ClientOptions { return d.GetGateway().GetOptions() }
 func (d *Device) GetGateway() *Gateway            { return d.GatewayResolver() }
-func (d *Device) GetEndpoint() string             { return "/locks" }
+func (*Device) GetResource() string               { return "locks" }
+
+func (d *Device) UnmarshalBinary(data []byte) error       { return json.UnmarshalNoEscape(data, d) }
+func (d *Device) MarshalBinary() (data []byte, err error) { return json.MarshalNoEscape(d) }
