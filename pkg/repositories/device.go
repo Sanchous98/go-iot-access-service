@@ -2,32 +2,23 @@ package repositories
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/models"
-	"bitbucket.org/4suites/iot-service-golang/pkg/utils"
 	"context"
 	"github.com/eko/gocache/v3/cache"
-	"github.com/eko/gocache/v3/store"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"log"
-	"time"
 )
 
 type DeviceRepository struct {
 	*RegistryRepository[*models.Device] `inject:""`
 
-	gatewayRepository Repository[*models.Gateway]                `inject:""`
-	cache             cache.SetterCacheInterface[*models.Device] `inject:""`
+	gatewayRepository Repository[*models.Gateway]          `inject:""`
+	cache             cache.CacheInterface[*models.Device] `inject:""`
 }
 
 func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
-	if item, err := r.cache.GetCodec().Get(context.Background(), id.String()); err == nil && item != nil {
+	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
 		log.Printf("Device %s hitted cache\n", id.String())
-		var device models.Device
-		_ = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &device)
-		device.GatewayResolver = func() *models.Gateway {
-			return r.gatewayRepository.Find(device.GatewayId)
-		}
-		return &device
+		return item
 	}
 
 	device := r.RegistryRepository.find(id)
@@ -44,14 +35,12 @@ func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
 
 func (r *DeviceRepository) FindByMacId(macId string) *models.Device {
 	// TODO: Try to refactor
-	if item, err := r.cache.GetCodec().Get(context.Background(), macId); err == nil && item != nil {
+	if item, err := r.cache.Get(context.Background(), macId); err == nil && item != nil {
 		log.Printf("Device %s hitted cache\n", macId)
-		var device models.Device
-		_ = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &device)
-		device.GatewayResolver = func() *models.Gateway {
-			return r.gatewayRepository.Find(device.GatewayId)
+		item.GatewayResolver = func() *models.Gateway {
+			return r.gatewayRepository.Find(item.GatewayId)
 		}
-		return &device
+		return item
 	}
 
 	devices := r.RegistryRepository.findAll(map[string]any{"macId": macId})
@@ -89,11 +78,11 @@ func (r *DeviceRepository) FindAll() []*models.Device {
 }
 
 func (r *DeviceRepository) pushCache(device *models.Device) {
-	if err := r.cache.Set(context.Background(), device.Id.String(), device, store.WithExpiration(1*time.Hour)); err != nil {
+	if err := r.cache.Set(context.Background(), device.Id.String(), device); err != nil {
 		log.Println(err)
 	}
 
-	if err := r.cache.Set(context.Background(), device.MacId, device, store.WithExpiration(1*time.Hour)); err != nil {
+	if err := r.cache.Set(context.Background(), device.MacId, device); err != nil {
 		log.Println(err)
 	}
 }

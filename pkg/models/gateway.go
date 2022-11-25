@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 )
 
@@ -45,6 +44,3 @@ func (g *Gateway) GetTopics() map[string]byte {
 func (g *Gateway) GetOptions() *mqtt.ClientOptions { return g.GetBroker().GetOptions() }
 func (g *Gateway) GetBroker() *Broker              { return g.BrokerResolver() }
 func (*Gateway) GetResource() string               { return "gateways" }
-
-func (g *Gateway) UnmarshalBinary(data []byte) error       { return json.UnmarshalNoEscape(data, g) }
-func (g *Gateway) MarshalBinary() (data []byte, err error) { return json.MarshalNoEscape(g) }

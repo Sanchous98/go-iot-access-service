@@ -46,13 +46,13 @@ func (r *RegistryRepository[T]) Destructor() {
 	r.client = nil
 }
 
-func (r *RegistryRepository[T]) GetUrl() string {
+func (r *RegistryRepository[T]) getUrl() string {
 	var model WithResource = *new(T)
 	return r.ApiBaseUrl + "/" + strings.TrimPrefix(model.GetResource(), "/")
 }
 
 func (r *RegistryRepository[T]) find(id uuid.UUID) T {
-	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.GetUrl(), id.String(), r.ApiKey)).
+	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.getUrl(), id.String(), r.ApiKey)).
 		Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	code, body, errors := agent.Bytes()
 
@@ -72,7 +72,7 @@ func (r *RegistryRepository[T]) find(id uuid.UUID) T {
 
 func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("%s?key=%s", r.GetUrl(), r.ApiKey))
+	builder.WriteString(fmt.Sprintf("%s?key=%s", r.getUrl(), r.ApiKey))
 
 	if condition != nil {
 		for key, value := range condition {

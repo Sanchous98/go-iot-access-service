@@ -2,6 +2,7 @@ package main
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/api"
+	"bitbucket.org/4suites/iot-service-golang/pkg/cache"
 	"bitbucket.org/4suites/iot-service-golang/pkg/handlers"
 	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
@@ -9,7 +10,8 @@ import (
 	"context"
 	"github.com/Sanchous98/go-di"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/eko/gocache/v3/cache"
+	gocache "github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/v3/metrics"
 	"github.com/eko/gocache/v3/store"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
@@ -20,6 +22,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -57,17 +60,19 @@ func main() {
 		return store.NewRedis(redis.NewClient(&redis.Options{
 			Addr: environment.GetParam("REDIS_HOST"),
 			DB:   db,
-		}))
+		}), store.WithExpiration(1*time.Hour))
 	})
 
-	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Broker] {
-		return cache.New[*models.Broker](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	promMetrics := metrics.NewPrometheus("go-iot-access-service")
+
+	app.Set(func(container di.Container) gocache.CacheInterface[*models.Broker] {
+		return gocache.NewMetric[*models.Broker](promMetrics, cache.New[models.Broker](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
-	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Device] {
-		return cache.New[*models.Device](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	app.Set(func(container di.Container) gocache.CacheInterface[*models.Device] {
+		return gocache.NewMetric[*models.Device](promMetrics, cache.New[models.Device](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
-	app.Set(func(container di.Container) cache.SetterCacheInterface[*models.Gateway] {
-		return cache.New[*models.Gateway](container.Get(new(store.StoreInterface)).(store.StoreInterface))
+	app.Set(func(container di.Container) gocache.CacheInterface[*models.Gateway] {
+		return gocache.NewMetric[*models.Gateway](promMetrics, cache.New[models.Gateway](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
 
 	app.Set(func(container di.Container) repositories.Repository[*models.Gateway] {

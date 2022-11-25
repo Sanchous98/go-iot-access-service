@@ -2,30 +2,26 @@ package repositories
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/models"
-	"bitbucket.org/4suites/iot-service-golang/pkg/utils"
 	"context"
+	"errors"
 	"github.com/eko/gocache/v3/cache"
 	"github.com/eko/gocache/v3/store"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"log"
-	"time"
 )
 
 type GatewayRepository struct {
 	*RegistryRepository[*models.Gateway] `inject:""`
 
-	brokerRepository Repository[*models.Broker]                  `inject:""`
-	cache            cache.SetterCacheInterface[*models.Gateway] `inject:""`
+	brokerRepository Repository[*models.Broker]            `inject:""`
+	cache            cache.CacheInterface[*models.Gateway] `inject:""`
 }
 
 func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
-	if item, err := r.cache.GetCodec().Get(context.Background(), id.String()); err == nil && item != nil {
+	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
 		log.Printf("Gateway %s hitted cache\n", id.String())
-		var gateway models.Gateway
-		_ = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &gateway)
-		gateway.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(gateway.BrokerId) }
-		return &gateway
+		item.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(item.BrokerId) }
+		return item
 	}
 
 	gateway := r.RegistryRepository.find(id)
@@ -40,30 +36,28 @@ func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 	return gateway
 }
 
-func (r *GatewayRepository) FindByMacId(macId string) *models.Gateway {
-	// TODO: Try to refactor
-	if item, err := r.cache.GetCodec().Get(context.Background(), macId); err == nil && item != nil {
-		log.Printf("Device %s hitted cache\n", macId)
-		var gateway models.Gateway
-		_ = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &gateway)
-		gateway.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(gateway.BrokerId) }
-		return &gateway
-	}
+func (r *GatewayRepository) FindByMacId(macId string) (item *models.Gateway) {
+	var err error
 
-	gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": macId})
+	if item, err = r.cache.Get(context.Background(), macId); errors.Is(err, new(store.NotFound)) {
+		gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": macId})
 
-	if len(gateways) == 0 {
+		if len(gateways) == 0 {
+			return nil
+		}
+
+		item = gateways[0]
+		r.pushCache(item)
+	} else if err != nil {
+		log.Println(err)
 		return nil
 	}
-
-	item := gateways[0]
-	r.pushCache(item)
 
 	item.BrokerResolver = func() *models.Broker {
 		return r.brokerRepository.Find(item.BrokerId)
 	}
 
-	return item
+	return
 }
 
 func (r *GatewayRepository) FindAll() []*models.Gateway {
@@ -83,11 +77,11 @@ func (r *GatewayRepository) FindAll() []*models.Gateway {
 }
 
 func (r *GatewayRepository) pushCache(gateway *models.Gateway) {
-	if err := r.cache.Set(context.Background(), gateway.Id.String(), gateway, store.WithExpiration(1*time.Hour)); err != nil {
+	if err := r.cache.Set(context.Background(), gateway.Id.String(), gateway); err != nil {
 		log.Println(err)
 	}
 
-	if err := r.cache.Set(context.Background(), gateway.GatewayIeee, gateway, store.WithExpiration(1*time.Hour)); err != nil {
+	if err := r.cache.Set(context.Background(), gateway.GatewayIeee, gateway); err != nil {
 		log.Println(err)
 	}
 }

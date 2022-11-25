@@ -3,6 +3,8 @@ version: '3.7'
 services:
   cache:
     image: redis:latest
+    ports:
+      - "8379:6379"
 
   access:
     container_name: go-iot-access-service
