@@ -85,8 +85,10 @@ func main() {
 
 	app.Set(new(services.HandlerAggregator[*models.Broker]))
 	app.Set(new(services.HandlerAggregator[*models.Gateway]))
+
 	app.Set(new(handlers.VerifyOnlineHandler), "mqtt.message_handler")
-	//app.Set(new(handlers.LogHandler), "mqtt.message_handler")
+	app.Set(new(handlers.LocalStorageQueue), "mqtt.message_handler")
+
 	app.Run(app.LoadEnv)
 }
 

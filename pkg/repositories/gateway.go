@@ -36,11 +36,11 @@ func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 	return gateway
 }
 
-func (r *GatewayRepository) FindByMacId(macId string) (item *models.Gateway) {
+func (r *GatewayRepository) FindByMacId(gatewayIeee string) (item *models.Gateway) {
 	var err error
 
-	if item, err = r.cache.Get(context.Background(), macId); errors.Is(err, new(store.NotFound)) {
-		gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": macId})
+	if item, err = r.cache.Get(context.Background(), gatewayIeee); errors.Is(err, new(store.NotFound)) {
+		gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": gatewayIeee})
 
 		if len(gateways) == 0 {
 			return nil
