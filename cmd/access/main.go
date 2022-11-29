@@ -40,7 +40,7 @@ func main() {
 	app.AddEntryPoint(bootstrap)
 
 	app.Set(new(api.ServerApi))
-	app.Set(new(api.Handler))
+	app.Set(new(api.AccessApiHandler), "api.handler")
 	app.Set(func(environment di.GlobalState) *gorm.DB {
 		db, err := gorm.Open(mysql.Open(environment.GetParam("DATABASE_DSN")))
 

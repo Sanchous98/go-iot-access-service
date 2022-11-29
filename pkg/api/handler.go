@@ -23,15 +23,15 @@ func (Device) TableName() string {
 	return "devices"
 }
 
-type Handler struct {
+type AccessApiHandler struct {
 	service    services.DeviceService        `inject:""`
 	repository repositories.DeviceRepository `inject:""`
 	server     *ServerApi                    `inject:""`
 	db         *gorm.DB                      `inject:""`
 }
 
-func (h *Handler) Constructor() {
-	h.server.Post(
+func (h *AccessApiHandler) RegisterRoutes(app *fiber.App) {
+	app.Post(
 		"/devices/:deviceId/:action",
 		checkPath,
 		convertCoreDeviceIdToRegistryMac(h.db),
