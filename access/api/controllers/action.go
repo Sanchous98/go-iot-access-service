@@ -1,4 +1,4 @@
-package api
+package controllers
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
@@ -33,11 +33,11 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 
 		switch ctx.Params("action") {
 		case "open":
-			service.Open(device, body.ChannelsIds)
+			err = service.OpenSync(ctx.UserContext(), device, body.ChannelsIds)
 		case "close":
-			service.Close(device)
+			err = service.CloseSync(ctx.UserContext(), device)
 		case "auto":
-			service.Auto(device, body.RecloseDelay, body.ChannelsIds)
+			err = service.AutoSync(ctx.UserContext(), device, body.RecloseDelay, body.ChannelsIds)
 		}
 
 		if err != nil {

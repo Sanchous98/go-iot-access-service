@@ -22,7 +22,7 @@ func (s *DeviceService) Open(device *models.Device, channels []int) mqtt.Token {
 	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, channels []int) error {
-	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
 		return response.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
 			response.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
 				len(response.Payload.ChannelIds) > 0
@@ -30,7 +30,7 @@ func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, 
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Open(device, channels) }, responseHandler)
+	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Open(device, channels) }, responseValidator)
 }
 
 func (s *DeviceService) Close(device *models.Device) mqtt.Token {
@@ -39,7 +39,7 @@ func (s *DeviceService) Close(device *models.Device) mqtt.Token {
 	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) CloseSync(parent context.Context, device *models.Device) error {
-	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
 		return response.Payload.LockActionStatus == messages.LockClosedLockStatus ||
 			response.Payload.LockActionStatus == messages.ErrorLockAlreadyClosedLockStatus &&
 				len(response.Payload.ChannelIds) > 0
@@ -47,7 +47,7 @@ func (s *DeviceService) CloseSync(parent context.Context, device *models.Device)
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Close(device) }, responseHandler)
+	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Close(device) }, responseValidator)
 }
 
 func (s *DeviceService) Auto(device *models.Device, recloseDelay byte, channels []int) mqtt.Token {
@@ -56,7 +56,7 @@ func (s *DeviceService) Auto(device *models.Device, recloseDelay byte, channels 
 	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) AutoSync(parent context.Context, device *models.Device, recloseDelay byte, channels []int) error {
-	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
 		return response.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
 			response.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
 				len(response.Payload.ChannelIds) > 0
@@ -64,7 +64,7 @@ func (s *DeviceService) AutoSync(parent context.Context, device *models.Device, 
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Auto(device, recloseDelay, channels) }, responseHandler)
+	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Auto(device, recloseDelay, channels) }, responseValidator)
 }
 
 func (s *DeviceService) AllowKeyAccess(device *models.Device, transactionId int, payload map[string]any) <-chan mqtt.Token {
@@ -73,8 +73,9 @@ func (s *DeviceService) AllowKeyAccess(device *models.Device, transactionId int,
 func (s *DeviceService) AllowKeyAccessSync(device *models.Device, transactionId int, payload map[string]any) error {
 	select {
 	case token := <-s.AllowKeyAccess(device, transactionId, payload):
-		if token.Wait() && token.Error() != nil {
-			return token.Error()
+		token.Wait()
+		if err := token.Error(); err != nil {
+			return err
 		}
 	}
 
@@ -84,8 +85,9 @@ func (s *DeviceService) AllowKeyAccessSync(device *models.Device, transactionId 
 func (s *DeviceService) DenyKeyAccessSync(device *models.Device, transactionId int, payload map[string]any) error {
 	select {
 	case token := <-s.DenyKeyAccess(device, transactionId, payload):
-		if token.Wait() && token.Error() != nil {
-			return token.Error()
+		token.Wait()
+		if err := token.Error(); err != nil {
+			return err
 		}
 	}
 
@@ -145,6 +147,10 @@ func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Conte
 	token := action()
 	token.Wait()
 
+	if err := token.Error(); err != nil {
+		return err
+	}
+
 	select {
 	case <-ctx.Done():
 		message, _ := json.MarshalNoEscape(messages.NewLockOfflineResponse())
@@ -154,4 +160,23 @@ func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Conte
 	case err := <-errorChan:
 		return err
 	}
+}
+
+func (s *DeviceService) EnqueueCommand(device *models.Device, name string, payload map[string]any) (int, error) {
+	return 0, nil
+}
+
+func (s *DeviceService) Locate(device *models.Device, transactionId int) mqtt.Token {
+	message, _ := json.MarshalNoEscape(messages.NewLocateRequest(transactionId))
+	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 0, false, message)
+}
+
+func (s *DeviceService) LocateSync(device *models.Device, transactionId int) error {
+	token := s.Locate(device, transactionId)
+
+	if !token.WaitTimeout(7 * time.Second) {
+		return fiber.ErrGatewayTimeout
+	}
+
+	return token.Error()
 }

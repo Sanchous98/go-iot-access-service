@@ -1,8 +1,6 @@
-package api
+package middleware
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
-	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	"github.com/goccy/go-reflect"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -23,22 +21,6 @@ func (Device) TableName() string {
 	return "devices"
 }
 
-type AccessApiHandler struct {
-	service    services.DeviceService        `inject:""`
-	repository repositories.DeviceRepository `inject:""`
-	server     *ServerApi                    `inject:""`
-	db         *gorm.DB                      `inject:""`
-}
-
-func (h *AccessApiHandler) RegisterRoutes(app *fiber.App) {
-	app.Post(
-		"/devices/:deviceId/:action",
-		checkPath,
-		convertCoreDeviceIdToRegistryMac(h.db),
-		Action(h.service, h.repository),
-	)
-}
-
 // TODO: Remove after demo
 func convertCoreApiIdToRegistryMacId(db *gorm.DB, deviceCoreId int) string {
 	if item, hit := cache.Load(deviceCoreId); hit {
@@ -53,7 +35,7 @@ func convertCoreApiIdToRegistryMacId(db *gorm.DB, deviceCoreId int) string {
 
 	return device.MacId
 }
-func convertCoreDeviceIdToRegistryMac(db *gorm.DB) fiber.Handler {
+func ConvertCoreDeviceIdToRegistryMac(db *gorm.DB) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		var deviceId string
 		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
@@ -76,14 +58,4 @@ func convertCoreDeviceIdToRegistryMac(db *gorm.DB) fiber.Handler {
 
 		return ctx.Next()
 	}
-}
-func checkPath(ctx *fiber.Ctx) error {
-	switch ctx.Params("action") {
-	case "open":
-	case "close":
-	case "auto":
-	default:
-		return fiber.ErrNotFound
-	}
-	return ctx.Next()
 }

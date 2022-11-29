@@ -41,6 +41,14 @@ func (g *Gateway) GetTopics() map[string]byte {
 		fmt.Sprintf("$foursuites/gw/%s/dev/+/actions", g.GatewayIeee): 0,
 	}
 }
+func (g *Gateway) GetCommandTopic() string {
+	return fmt.Sprintf("$foursuites/gw/%s/actions", g.GatewayIeee)
+}
+func (g *Gateway) GetEventsTopic() string {
+	return fmt.Sprintf("$foursuites/gw/%s/info", g.GatewayIeee)
+}
+
+// GetOptions TODO: Reuse broker clients
 func (g *Gateway) GetOptions() *mqtt.ClientOptions { return g.GetBroker().GetOptions() }
 func (g *Gateway) GetBroker() *Broker              { return g.BrokerResolver() }
 func (*Gateway) GetResource() string               { return "gateways" }

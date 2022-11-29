@@ -5,7 +5,7 @@ type EventType string
 type EmptyPayload struct{}
 
 type EventRequestPayloads interface {
-	DeviceConfig | EmptyPayload | LockAuto | LocalStorageEvent | Auth
+	DeviceConfig | EmptyPayload | LockAuto | LocalStorageEvent | Auth | UpdateNetworkState | RemoveDevice
 }
 
 type EventRequest[T EventRequestPayloads] struct {

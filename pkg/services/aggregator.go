@@ -20,15 +20,15 @@ type Handler interface {
 	CanHandle(client mqtt.Client, message mqtt.Message) bool
 }
 
-type HandlerFunc func(client mqtt.Client, message mqtt.Message)
-
-func (h HandlerFunc) Handle(client mqtt.Client, message mqtt.Message) { h(client, message) }
-func (h HandlerFunc) CanHandle(mqtt.Client, mqtt.Message) bool        { return true }
-
 type Aggregatable interface {
 	Connectable
 	repositories.WithResource
 }
+
+type HandlerFunc func(client mqtt.Client, message mqtt.Message)
+
+func (h HandlerFunc) Handle(client mqtt.Client, message mqtt.Message) { h(client, message) }
+func (h HandlerFunc) CanHandle(mqtt.Client, mqtt.Message) bool        { return true }
 
 type HandlerAggregator[T Aggregatable] struct {
 	registeredHandlers []Handler                  `inject:"mqtt.message_handler"`
@@ -64,6 +64,7 @@ func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan
 	return nil
 }
 
+// Launch TODO: Make clients' pool and reuse broker client in gateways
 func (a *HandlerAggregator[T]) Launch(context.Context) {
 	items := a.repository.FindAll()
 

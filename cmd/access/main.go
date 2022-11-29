@@ -1,27 +1,24 @@
 package main
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/pkg/api"
+	"bitbucket.org/4suites/iot-service-golang/access/api"
+	"bitbucket.org/4suites/iot-service-golang/cmd/internal"
 	"bitbucket.org/4suites/iot-service-golang/pkg/cache"
-	"bitbucket.org/4suites/iot-service-golang/pkg/handlers"
+	"bitbucket.org/4suites/iot-service-golang/pkg/http"
+	"bitbucket.org/4suites/iot-service-golang/pkg/listeners"
 	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
 	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	"context"
 	"github.com/Sanchous98/go-di"
 	"github.com/allegro/bigcache/v3"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	gocache "github.com/eko/gocache/v3/cache"
 	"github.com/eko/gocache/v3/metrics"
 	"github.com/eko/gocache/v3/store"
 	"github.com/go-redis/redis/v8"
-	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
-	"os"
 	"strconv"
 	"time"
 )
@@ -37,9 +34,9 @@ func main() {
 	}()
 
 	app := di.Application(ctx)
-	app.AddEntryPoint(bootstrap)
+	app.AddEntryPoint(internal.Bootstrap)
 
-	app.Set(new(api.ServerApi))
+	app.Set(new(http.ServerApi))
 	app.Set(new(api.AccessApiHandler), "api.handler")
 	app.Set(func(environment di.GlobalState) *gorm.DB {
 		db, err := gorm.Open(mysql.Open(environment.GetParam("DATABASE_DSN")))
@@ -75,31 +72,9 @@ func main() {
 
 	app.Set(new(services.HandlerAggregator[*models.Broker]))
 	app.Set(new(services.HandlerAggregator[*models.Gateway]))
-
-	app.Set(new(handlers.VerifyOnlineHandler), "mqtt.message_handler")
-	app.Set(new(handlers.LocalStorageQueue), "mqtt.message_handler")
+	app.Set(new(listeners.VerifyOnlineHandler), "mqtt.message_handler")
 
 	app.Run(app.LoadEnv)
-}
-
-func bootstrap(container di.GlobalState) {
-	if container.GetParam("APP_ENV") != "prod" && container.GetParam("APP_ENV") != "production" {
-		mqtt.ERROR = log.New(os.Stdout, "[mqtt:ERROR]::", log.LUTC)
-		mqtt.WARN = log.New(os.Stdout, "[mqtt:WARN]::", log.LUTC)
-	}
-
-	mqtt.CRITICAL = log.New(os.Stdout, "[mqtt:CRITICAL]::", log.LUTC)
-
-	//if container.GetParam("APP_ENV") == "dev" || container.GetParam("APP_ENV") == "development" {
-	//	mqtt.DEBUG = log.New(os.Stdout, "[mqtt:DEBUG]::", log.LUTC)
-	//}
-
-	profiler := fiber.New(fiber.Config{
-		JSONDecoder: func(data []byte, v any) error { return json.UnmarshalNoEscape(data, v) },
-		JSONEncoder: func(v any) ([]byte, error) { return json.MarshalNoEscape(v) },
-	})
-	profiler.Use(pprof.New())
-	log.Println(profiler.Listen(":6060"))
 }
 
 func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.StoreInterface {
@@ -128,6 +103,6 @@ func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.St
 			}), store.WithExpiration(1*time.Hour))
 		}
 
-		return nil
+		panic("unknown cache storage")
 	}
 }

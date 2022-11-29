@@ -1,4 +1,4 @@
-package handlers
+package listeners
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/messages"
@@ -13,10 +13,6 @@ import (
 	"strings"
 )
 
-type authorizationResponsePayload struct {
-	AccessibleChannels []int `json:"accessibleChannels"`
-}
-
 type VerifyOnlineHandler struct {
 	regexp            *regexp.Regexp
 	deviceRepository  repositories.DeviceRepository  `inject:""`
@@ -25,6 +21,63 @@ type VerifyOnlineHandler struct {
 	coreApiKey        string                         `env:"CORE_API_SERVICE_ACCESS_TOKEN"`
 	deviceService     *services.DeviceService        `inject:""`
 	client            *fiber.Client
+}
+
+func (h *VerifyOnlineHandler) Constructor() {
+	h.regexp = regexp.MustCompile(`^\$foursuites/gw/(.+)/dev/(.+)/events$`)
+	h.client = fiber.AcquireClient()
+}
+
+func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
+	var p messages.Response[messages.Auth]
+	_ = json.UnmarshalNoEscape(message.Payload(), &p)
+
+	p.Payload.HashKey = strings.TrimPrefix(p.Payload.HashKey, "0x")
+
+	res := h.regexp.FindStringSubmatch(message.Topic())
+	gatewayMacId := res[1]
+	deviceMacId := res[2]
+	device := h.deviceRepository.FindByMacId(deviceMacId)
+
+	if device == nil {
+		return
+	}
+
+	device.Gateway = h.gatewayRepository.FindByIeee(gatewayMacId)
+	response := h.authorizationRequest(deviceMacId, gatewayMacId, p.Payload.HashKey, p.Payload.AuthType)
+
+	if response == nil || response.AccessibleChannels == nil || len(response.AccessibleChannels) == 0 {
+		err := h.deviceService.DenyKeyAccessSync(device, 0, map[string]any{
+			"hashKey":  p.Payload.HashKey,
+			"authType": p.Payload.AuthType,
+		})
+
+		if err != nil {
+			mqtt.ERROR.Println(err)
+		}
+
+		return
+	}
+
+	err := h.deviceService.AllowKeyAccessSync(device, 0, map[string]any{
+		"hashKey":    p.Payload.HashKey,
+		"authType":   p.Payload.AuthType,
+		"channelIds": response.AccessibleChannels,
+	})
+
+	if err != nil {
+		mqtt.ERROR.Println(err)
+	}
+}
+
+func (h *VerifyOnlineHandler) CanHandle(_ mqtt.Client, message mqtt.Message) bool {
+	var p messages.Response[messages.Auth]
+	err := json.UnmarshalNoEscape(message.Payload(), &p)
+	return err == nil && h.regexp.MatchString(message.Topic()) && p.Payload.AuthStatus == messages.VerifyOnlineStatus
+}
+
+type authorizationResponsePayload struct {
+	AccessibleChannels []int `json:"accessibleChannels"`
 }
 
 func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, hashKey string, authTypes messages.AuthType) *authorizationResponsePayload {
@@ -66,57 +119,4 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 	_ = json.UnmarshalNoEscape(body, &responseData)
 
 	return responseData.Data
-}
-
-func (h *VerifyOnlineHandler) Constructor() {
-	h.regexp = regexp.MustCompile(`^\$foursuites/gw/(.+)/dev/(.+)/events$`)
-	h.client = fiber.AcquireClient()
-}
-
-func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
-	var p messages.Response[messages.Auth]
-	_ = json.UnmarshalNoEscape(message.Payload(), &p)
-
-	p.Payload.HashKey = strings.TrimPrefix(p.Payload.HashKey, "0x")
-
-	res := h.regexp.FindStringSubmatch(message.Topic())
-	gatewayMacId := res[1]
-	deviceMacId := res[2]
-	device := h.deviceRepository.FindByMacId(deviceMacId)
-
-	if device == nil {
-		return
-	}
-
-	device.Gateway = h.gatewayRepository.FindByMacId(gatewayMacId)
-	response := h.authorizationRequest(deviceMacId, gatewayMacId, p.Payload.HashKey, p.Payload.AuthType)
-
-	if response == nil || response.AccessibleChannels == nil || len(response.AccessibleChannels) == 0 {
-		err := h.deviceService.DenyKeyAccessSync(device, 0, map[string]any{
-			"hashKey":  p.Payload.HashKey,
-			"authType": p.Payload.AuthType,
-		})
-
-		if err != nil {
-			mqtt.ERROR.Println(err)
-		}
-
-		return
-	}
-
-	err := h.deviceService.AllowKeyAccessSync(device, 0, map[string]any{
-		"hashKey":    p.Payload.HashKey,
-		"authType":   p.Payload.AuthType,
-		"channelIds": response.AccessibleChannels,
-	})
-
-	if err != nil {
-		mqtt.ERROR.Println(err)
-	}
-}
-
-func (h *VerifyOnlineHandler) CanHandle(_ mqtt.Client, message mqtt.Message) bool {
-	var p messages.Response[messages.Auth]
-	err := json.UnmarshalNoEscape(message.Payload(), &p)
-	return err == nil && h.regexp.MatchString(message.Topic()) && p.Payload.AuthStatus == messages.VerifyOnlineStatus
 }

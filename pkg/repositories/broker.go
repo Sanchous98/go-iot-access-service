@@ -15,7 +15,6 @@ type BrokerRepository struct {
 }
 
 func (r *BrokerRepository) Find(id uuid.UUID) *models.Broker {
-	// TODO: Try to refactor
 	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
 		log.Printf("Broker %s hitted cache\n", id.String())
 		return item

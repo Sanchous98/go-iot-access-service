@@ -36,7 +36,7 @@ func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 	return gateway
 }
 
-func (r *GatewayRepository) FindByMacId(gatewayIeee string) (item *models.Gateway) {
+func (r *GatewayRepository) FindByIeee(gatewayIeee string) (item *models.Gateway) {
 	var err error
 
 	if item, err = r.cache.Get(context.Background(), gatewayIeee); errors.Is(err, new(store.NotFound)) {

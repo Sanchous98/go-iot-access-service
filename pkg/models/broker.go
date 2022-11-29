@@ -32,12 +32,16 @@ func (b *Broker) GetOptions() *mqtt.ClientOptions {
 	cert, _ := tls.X509KeyPair(utils.StrToBytes(b.ClientCertificate), utils.StrToBytes(b.ClientKey))
 	clientOptions := mqtt.NewClientOptions()
 	clientOptions.AddBroker(fmt.Sprintf("%s:%d", b.Host, b.Port)).
+		// TODO: Make ClientID immutable for each broker
 		SetClientID(fmt.Sprintf("4suites-%s-%d", b.Id.String(), time.Now().UnixNano())).
 		SetProtocolVersion(4).
 		SetTLSConfig(&tls.Config{
 			Certificates:       []tls.Certificate{cert},
 			InsecureSkipVerify: true,
-		})
+		}).
+		SetAutoReconnect(true).
+		SetConnectRetry(true).
+		SetOrderMatters(false)
 
 	return clientOptions
 }

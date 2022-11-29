@@ -33,7 +33,6 @@ func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
 }
 
 func (r *DeviceRepository) FindByMacId(macId string) *models.Device {
-	// TODO: Try to refactor
 	if item, err := r.cache.Get(context.Background(), macId); err == nil && item != nil {
 		log.Printf("Device %s hitted cache\n", macId)
 		return item
