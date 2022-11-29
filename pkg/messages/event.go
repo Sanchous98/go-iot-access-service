@@ -27,7 +27,7 @@ type EventResponse[T LockResponse | DeviceStatusResponsePayload] struct {
 	TransactionId int `json:"transactionId"`
 }
 
-type Response[T Auth] struct {
+type Response[T Auth | LockResponse] struct {
 	ShortAddr     string    `json:"short_addr"`
 	ExtAddr       string    `json:"ext_addr"`
 	Rssi          int       `json:"rssi"`

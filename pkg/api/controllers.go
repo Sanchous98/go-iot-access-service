@@ -23,20 +23,21 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 		}
 
 		var body requestShape
+		var err error
 
-		err := ctx.BodyParser(&body)
-		if err != nil {
-			log.Println(err)
-			return fiber.ErrUnprocessableEntity
-		}
+		_ = ctx.BodyParser(&body)
+		//if err != nil {
+		//	log.Println(err)
+		//	return fiber.ErrUnprocessableEntity
+		//}
 
 		switch ctx.Params("action") {
 		case "open":
-			err = service.OpenSync(ctx.UserContext(), device, body.ChannelsIds)
+			service.Open(device, body.ChannelsIds)
 		case "close":
-			err = service.CloseSync(ctx.UserContext(), device)
+			service.Close(device)
 		case "auto":
-			err = service.AutoSync(ctx.UserContext(), device, body.RecloseDelay, body.ChannelsIds)
+			service.Auto(device, body.RecloseDelay, body.ChannelsIds)
 		}
 
 		if err != nil {

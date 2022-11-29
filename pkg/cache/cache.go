@@ -30,7 +30,13 @@ func (c *Cache[T]) Get(ctx context.Context, key any) (*T, error) {
 
 	var result T
 
-	err = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &result)
+	switch item.(type) {
+	case []byte:
+		err = json.UnmarshalNoEscape(item.([]byte), &result)
+	case string:
+		err = json.UnmarshalNoEscape(utils.StrToBytes(item.(string)), &result)
+	}
+
 	return &result, err
 }
 
@@ -40,7 +46,6 @@ func (c *Cache[T]) Set(ctx context.Context, key any, object *T, options ...store
 	switch key.(type) {
 	case []byte:
 		key = utils.BytesToStr(key.([]byte))
-	case string:
 	case fmt.Stringer:
 		key = key.(fmt.Stringer).String()
 	}

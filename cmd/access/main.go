@@ -9,6 +9,7 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	"context"
 	"github.com/Sanchous98/go-di"
+	"github.com/allegro/bigcache/v3"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	gocache "github.com/eko/gocache/v3/cache"
 	"github.com/eko/gocache/v3/metrics"
@@ -50,18 +51,7 @@ func main() {
 		return db
 	})
 
-	app.Set(func(environment di.GlobalState) store.StoreInterface {
-		db, err := strconv.Atoi(environment.GetParam("REDIS_DB"))
-
-		if err != nil {
-			panic(err)
-		}
-
-		return store.NewRedis(redis.NewClient(&redis.Options{
-			Addr: environment.GetParam("REDIS_HOST"),
-			DB:   db,
-		}), store.WithExpiration(1*time.Hour))
-	})
+	app.Set(cacheFactory(ctx))
 
 	promMetrics := metrics.NewPrometheus("go-iot-access-service")
 
@@ -110,4 +100,34 @@ func bootstrap(container di.GlobalState) {
 	})
 	profiler.Use(pprof.New())
 	log.Println(profiler.Listen(":6060"))
+}
+
+func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.StoreInterface {
+	return func(environment di.GlobalState) store.StoreInterface {
+		switch environment.GetParam("CACHE_STORAGE") {
+		case "null", "":
+			return new(cache.NullStore)
+		case "memory":
+			db, err := bigcache.New(ctx, bigcache.DefaultConfig(5*time.Minute))
+
+			if err != nil {
+				panic(err)
+			}
+
+			return store.NewBigcache(db)
+		case "redis":
+			db, err := strconv.Atoi(environment.GetParam("REDIS_DB"))
+
+			if err != nil {
+				panic(err)
+			}
+
+			return store.NewRedis(redis.NewClient(&redis.Options{
+				Addr: environment.GetParam("REDIS_HOST"),
+				DB:   db,
+			}), store.WithExpiration(1*time.Hour))
+		}
+
+		return nil
+	}
 }

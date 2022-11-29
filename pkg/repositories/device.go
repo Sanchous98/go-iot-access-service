@@ -28,7 +28,6 @@ func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
 	}
 
 	r.pushCache(device)
-	device.GatewayResolver = func() *models.Gateway { return r.gatewayRepository.Find(device.GatewayId) }
 
 	return device
 }
@@ -37,13 +36,10 @@ func (r *DeviceRepository) FindByMacId(macId string) *models.Device {
 	// TODO: Try to refactor
 	if item, err := r.cache.Get(context.Background(), macId); err == nil && item != nil {
 		log.Printf("Device %s hitted cache\n", macId)
-		item.GatewayResolver = func() *models.Gateway {
-			return r.gatewayRepository.Find(item.GatewayId)
-		}
 		return item
 	}
 
-	devices := r.RegistryRepository.findAll(map[string]any{"macId": macId})
+	devices := r.RegistryRepository.findAll(map[string]any{"macId": macId, "include": "gateway.broker"})
 
 	if len(devices) == 0 {
 		return nil
@@ -52,15 +48,11 @@ func (r *DeviceRepository) FindByMacId(macId string) *models.Device {
 	item := devices[0]
 	r.pushCache(item)
 
-	item.GatewayResolver = func() *models.Gateway {
-		return r.gatewayRepository.Find(item.GatewayId)
-	}
-
 	return item
 }
 
 func (r *DeviceRepository) FindAll() []*models.Device {
-	devices := r.RegistryRepository.findAll(map[string]any{"enabled": 1, "claimed": 1})
+	devices := r.RegistryRepository.findAll(map[string]any{"enabled": 1, "claimed": 1, "include": "gateway.broker"})
 
 	if len(devices) == 0 {
 		return devices
@@ -68,10 +60,6 @@ func (r *DeviceRepository) FindAll() []*models.Device {
 
 	for _, device := range devices {
 		r.pushCache(device)
-
-		device.GatewayResolver = func() *models.Gateway {
-			return r.gatewayRepository.Find(device.GatewayId)
-		}
 	}
 
 	return devices

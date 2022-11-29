@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/messages"
-	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
 	"bitbucket.org/4suites/iot-service-golang/pkg/services"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -89,8 +88,7 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 		return
 	}
 
-	gateway := h.gatewayRepository.FindByMacId(gatewayMacId)
-	device.GatewayResolver = func() *models.Gateway { return gateway }
+	device.Gateway = h.gatewayRepository.FindByMacId(gatewayMacId)
 	response := h.authorizationRequest(deviceMacId, gatewayMacId, p.Payload.HashKey, p.Payload.AuthType)
 
 	if response == nil || response.AccessibleChannels == nil || len(response.AccessibleChannels) == 0 {

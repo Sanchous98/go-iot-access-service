@@ -13,19 +13,19 @@ import (
 )
 
 type DeviceService struct {
-	aggregator *HandlerAggregator[*models.Broker] `inject:""`
+	aggregator *HandlerAggregator[*models.Gateway] `inject:""`
 }
 
 func (s *DeviceService) Open(device *models.Device, channels []int) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewLockOpenEvent(0, channels))
 
-	return s.aggregator.GetClient(device.GetGateway().GetBroker()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, channels []int) error {
-	responseHandler := func(response messages.EventResponse[messages.LockResponse]) bool {
-		return response.Event.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
-			response.Event.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
-				len(response.Event.Payload.ChannelIds) > 0
+	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+		return response.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
+			response.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
+				len(response.Payload.ChannelIds) > 0
 	}
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
@@ -36,13 +36,13 @@ func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, 
 func (s *DeviceService) Close(device *models.Device) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewLockCloseEvent(0))
 
-	return s.aggregator.GetClient(device.GetGateway().GetBroker()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) CloseSync(parent context.Context, device *models.Device) error {
-	responseHandler := func(response messages.EventResponse[messages.LockResponse]) bool {
-		return response.Event.Payload.LockActionStatus == messages.LockClosedLockStatus ||
-			response.Event.Payload.LockActionStatus == messages.ErrorLockAlreadyClosedLockStatus &&
-				len(response.Event.Payload.ChannelIds) > 0
+	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+		return response.Payload.LockActionStatus == messages.LockClosedLockStatus ||
+			response.Payload.LockActionStatus == messages.ErrorLockAlreadyClosedLockStatus &&
+				len(response.Payload.ChannelIds) > 0
 	}
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
@@ -53,13 +53,13 @@ func (s *DeviceService) CloseSync(parent context.Context, device *models.Device)
 func (s *DeviceService) Auto(device *models.Device, recloseDelay byte, channels []int) mqtt.Token {
 	message, _ := json.Marshal(messages.NewLockAutoEvent(0, recloseDelay, channels))
 
-	return s.aggregator.GetClient(device.GetGateway().GetBroker()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) AutoSync(parent context.Context, device *models.Device, recloseDelay byte, channels []int) error {
-	responseHandler := func(response messages.EventResponse[messages.LockResponse]) bool {
-		return response.Event.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
-			response.Event.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
-				len(response.Event.Payload.ChannelIds) > 0
+	responseHandler := func(response messages.Response[messages.LockResponse]) bool {
+		return response.Payload.LockActionStatus == messages.LockOpenedLockStatus ||
+			response.Payload.LockActionStatus == messages.ErrorLockAlreadyOpenLockStatus &&
+				len(response.Payload.ChannelIds) > 0
 	}
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
@@ -108,10 +108,10 @@ func (s *DeviceService) KeyAuthorization(device *models.Device, transactionId in
 
 	data, _ := json.Marshal(messages.NewAuthEvent(transactionId, auth))
 	log.Println(string(data))
-	return s.aggregator.Publish(device.GetGateway().GetBroker(), data, 0)
+	return s.aggregator.Publish(device.GetGateway(), data, 0)
 }
 
-func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Context, action func() mqtt.Token, lockOpened func(response messages.EventResponse[messages.LockResponse]) bool) error {
+func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Context, action func() mqtt.Token, lockOpened func(response messages.Response[messages.LockResponse]) bool) error {
 	errorChan := make(chan error)
 	var handler HandlerFunc
 
@@ -120,38 +120,38 @@ func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Conte
 			return
 		}
 
-		defer close(errorChan)
-
-		var response messages.EventResponse[messages.LockResponse]
+		var response messages.Response[messages.LockResponse]
 		if err := json.UnmarshalNoEscape(message.Payload(), &response); err != nil {
 			errorChan <- err
 			return
 		}
 
-		if response.Event.EventType == messages.LockActionResponse &&
+		if response.EventType == messages.LockActionResponse &&
 			response.TransactionId == 0 &&
-			response.Event.Payload.LockActionStatus != messages.ExtRelayStateLockStatus {
+			response.Payload.LockActionStatus != messages.ExtRelayStateLockStatus {
 			s.aggregator.Unregister(handler)
 		}
 
 		if !lockOpened(response) {
-			errorChan <- errors.New("Command failed with status: " + string(response.Event.Payload.LockActionStatus))
+			errorChan <- errors.New("Command failed with status: " + string(response.Payload.LockActionStatus))
+			return
 		}
+
+		errorChan <- nil
 	}
 
 	s.aggregator.Register(handler)
 	defer s.aggregator.Unregister(handler)
 	token := action()
+	token.Wait()
 
 	select {
 	case <-ctx.Done():
 		message, _ := json.MarshalNoEscape(messages.NewLockOfflineResponse())
-		s.aggregator.GetClient(device.GetGateway().GetBroker()).Publish(device.GetEventsTopic(), 2, false, message)
+		s.aggregator.GetClient(device.GetGateway()).Publish(device.GetEventsTopic(), 2, false, message)
 
 		return fiber.ErrGatewayTimeout
 	case err := <-errorChan:
 		return err
-	case <-token.Done():
-		return nil
 	}
 }

@@ -33,25 +33,21 @@ type Aggregatable interface {
 type HandlerAggregator[T Aggregatable] struct {
 	registeredHandlers []Handler                  `inject:"mqtt.message_handler"`
 	repository         repositories.Repository[T] `inject:""`
-	mu                 sync.Mutex
+	mu                 sync.RWMutex
 
 	clients sync.Map
 }
 
 func (a *HandlerAggregator[T]) Register(handlers ...Handler) {
-	a.mu.Lock()
 	a.registeredHandlers = append(a.registeredHandlers, handlers...)
-	a.mu.Unlock()
 }
 
 func (a *HandlerAggregator[T]) Unregister(handler Handler) {
-	a.mu.Lock()
 	for index, h := range a.registeredHandlers {
 		if sameHandler(handler, h) {
 			a.registeredHandlers = append(a.registeredHandlers[:index], a.registeredHandlers[index+1:]...)
 		}
 	}
-	a.mu.Unlock()
 }
 
 func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan mqtt.Token {
@@ -68,23 +64,24 @@ func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan
 	return nil
 }
 
-func (a *HandlerAggregator[T]) Launch(ctx context.Context) {
+func (a *HandlerAggregator[T]) Launch(context.Context) {
 	items := a.repository.FindAll()
 
 	for _, item := range items {
-		go func(item T) {
-			client := a.Subscribe(item.GetTopics(), item.GetOptions(), func(client mqtt.Client, message mqtt.Message) {
-				a.mu.Lock()
-				for _, handler := range a.registeredHandlers {
-					if handler.CanHandle(client, message) {
-						handler.Handle(client, message)
+		if len(item.GetTopics()) > 0 {
+			go func(item T) {
+				client := a.Subscribe(item.GetTopics(), item.GetOptions(), func(client mqtt.Client, message mqtt.Message) {
+					a.mu.RLock()
+					for _, handler := range a.registeredHandlers {
+						if handler.CanHandle(client, message) {
+							handler.Handle(client, message)
+						}
 					}
-				}
-				a.mu.Unlock()
-			})
-
-			a.clients.Store(item.GetId(), client)
-		}(item)
+					a.mu.RUnlock()
+				})
+				a.clients.Store(item.GetId(), client)
+			}(item)
+		}
 	}
 }
 

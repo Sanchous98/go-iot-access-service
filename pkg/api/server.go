@@ -20,5 +20,7 @@ func (s *ServerApi) Launch(context context.Context) {
 		ctx.SetUserContext(context)
 		return ctx.Next()
 	})
-	_ = s.Listen(s.host + ":" + s.port)
+	if err := s.Listen(s.host + ":" + s.port); err != nil {
+		panic(err)
+	}
 }

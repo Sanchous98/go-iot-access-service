@@ -19,7 +19,7 @@ type Device struct {
 	//CreatedAt          time.Time  `json:"createdAt"`
 	//UpdatedAt          time.Time  `json:"updatedAt"`
 
-	GatewayResolver func() *Gateway `json:"-"`
+	Gateway *Gateway `json:"gateway,ommitempty"`
 }
 
 func (d *Device) GetEventsTopic() string {
@@ -30,5 +30,5 @@ func (d *Device) GetCommandsTopic() string {
 	return fmt.Sprintf("$foursuites/gw/%s/dev/%s/actions", d.GetGateway().GatewayIeee, d.MacId)
 }
 func (d *Device) GetOptions() *mqtt.ClientOptions { return d.GetGateway().GetOptions() }
-func (d *Device) GetGateway() *Gateway            { return d.GatewayResolver() }
+func (d *Device) GetGateway() *Gateway            { return d.Gateway }
 func (*Device) GetResource() string               { return "locks" }
