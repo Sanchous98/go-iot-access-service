@@ -23,12 +23,11 @@ type Device struct {
 }
 
 func (d *Device) GetEventsTopic() string {
-	return fmt.Sprintf("$foursuites/gw/%s/dev/%s/events", d.GetGateway().GatewayIeee, d.MacId)
+	return fmt.Sprintf("$foursuites/gw/%s/dev/%s/events", d.Gateway.GatewayIeee, d.MacId)
 }
 
 func (d *Device) GetCommandsTopic() string {
-	return fmt.Sprintf("$foursuites/gw/%s/dev/%s/actions", d.GetGateway().GatewayIeee, d.MacId)
+	return fmt.Sprintf("$foursuites/gw/%s/dev/%s/actions", d.Gateway.GatewayIeee, d.MacId)
 }
-func (d *Device) GetOptions() *mqtt.ClientOptions { return d.GetGateway().GetOptions() }
-func (d *Device) GetGateway() *Gateway            { return d.Gateway }
+func (d *Device) GetOptions() *mqtt.ClientOptions { return d.Gateway.GetOptions() }
 func (*Device) GetResource() string               { return "locks" }

@@ -9,10 +9,12 @@ import (
 )
 
 type DeviceRepository struct {
-	*RegistryRepository[*models.Device] `inject:""`
+	RegistryRepository[*models.Device] `inject:""`
 
-	gatewayRepository Repository[*models.Gateway]          `inject:""`
-	cache             cache.CacheInterface[*models.Device] `inject:""`
+	gatewayRepository Repository[*models.Gateway]           `inject:""`
+	cache             cache.CacheInterface[*models.Device]  `inject:""`
+	brokerCache       cache.CacheInterface[*models.Broker]  `inject:""`
+	gatewayCache      cache.CacheInterface[*models.Gateway] `inject:""`
 }
 
 func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
@@ -21,7 +23,7 @@ func (r *DeviceRepository) Find(id uuid.UUID) *models.Device {
 		return item
 	}
 
-	device := r.RegistryRepository.find(id)
+	device := r.RegistryRepository.find(id, map[string]any{"include": "gateway.broker"})
 
 	if device == nil {
 		return nil
@@ -39,6 +41,24 @@ func (r *DeviceRepository) FindByMacId(macId string) *models.Device {
 	}
 
 	devices := r.RegistryRepository.findAll(map[string]any{"macId": macId, "include": "gateway.broker"})
+
+	if len(devices) == 0 {
+		return nil
+	}
+
+	item := devices[0]
+	r.pushCache(item)
+
+	return item
+}
+
+func (r *DeviceRepository) FindByMacIdAndGatewayIeee(deviceMacId string, gatewayIeee string) *models.Device {
+	if item, err := r.cache.Get(context.Background(), deviceMacId); err == nil && item != nil {
+		log.Printf("Device %s hitted cache\n", deviceMacId)
+		return item
+	}
+
+	devices := r.RegistryRepository.findAll(map[string]any{"macId": deviceMacId, "include": "gateway.broker", "gateway.gatewayIeee": gatewayIeee})
 
 	if len(devices) == 0 {
 		return nil
@@ -70,6 +90,18 @@ func (r *DeviceRepository) pushCache(device *models.Device) {
 	}
 
 	if err := r.cache.Set(context.Background(), device.MacId, device); err != nil {
+		log.Println(err)
+	}
+
+	if err := r.gatewayCache.Set(context.Background(), device.GatewayId.String(), device.Gateway); err != nil {
+		log.Println(err)
+	}
+
+	if err := r.gatewayCache.Set(context.Background(), device.Gateway.GatewayIeee, device.Gateway); err != nil {
+		log.Println(err)
+	}
+
+	if err := r.brokerCache.Set(context.Background(), device.Gateway.BrokerId.String(), device.Gateway.Broker); err != nil {
 		log.Println(err)
 	}
 }

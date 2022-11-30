@@ -1,6 +1,8 @@
 package repositories
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type WithResource interface {
 	GetResource() string

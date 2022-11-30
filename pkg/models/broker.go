@@ -6,6 +6,7 @@ import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
+	"log"
 	"time"
 )
 
@@ -32,16 +33,23 @@ func (b *Broker) GetOptions() *mqtt.ClientOptions {
 	cert, _ := tls.X509KeyPair(utils.StrToBytes(b.ClientCertificate), utils.StrToBytes(b.ClientKey))
 	clientOptions := mqtt.NewClientOptions()
 	clientOptions.AddBroker(fmt.Sprintf("%s:%d", b.Host, b.Port)).
-		// TODO: Make ClientID immutable for each broker
-		SetClientID(fmt.Sprintf("4suites-%s-%d", b.Id.String(), time.Now().UnixNano())).
+		SetClientID(fmt.Sprintf("4suites-broker-%s", b.Id.String())).
 		SetProtocolVersion(4).
 		SetTLSConfig(&tls.Config{
 			Certificates:       []tls.Certificate{cert},
 			InsecureSkipVerify: true,
 		}).
+		SetCleanSession(false).
 		SetAutoReconnect(true).
 		SetConnectRetry(true).
-		SetOrderMatters(false)
+		SetConnectRetryInterval(5 * time.Second).
+		SetOrderMatters(false).
+		SetReconnectingHandler(func(mqtt.Client, *mqtt.ClientOptions) {
+			log.Printf("Broker %s reconnecting\n", b.Id)
+		}).
+		SetOnConnectHandler(func(mqtt.Client) {
+			log.Printf("Broker %s connected\n", b.Id)
+		})
 
 	return clientOptions
 }

@@ -50,6 +50,6 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 			return fiber.ErrInternalServerError
 		}
 
-		return ctx.Status(200).JSON(fiber.Map{"status": 200})
+		return ctx.SendStatus(200)
 	}
 }

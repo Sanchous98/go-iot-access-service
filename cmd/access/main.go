@@ -70,8 +70,7 @@ func main() {
 		return container.Build(new(repositories.BrokerRepository)).(*repositories.BrokerRepository)
 	})
 
-	app.Set(new(services.HandlerAggregator[*models.Broker]))
-	app.Set(new(services.HandlerAggregator[*models.Gateway]))
+	app.Set(new(services.HandlerAggregator))
 	app.Set(new(listeners.VerifyOnlineHandler), "mqtt.message_handler")
 
 	app.Run(app.LoadEnv)

@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"fmt"
-	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"log"
@@ -51,21 +50,30 @@ func (r *RegistryRepository[T]) getUrl() string {
 	return r.ApiBaseUrl + "/" + strings.TrimPrefix(model.GetResource(), "/")
 }
 
-func (r *RegistryRepository[T]) find(id uuid.UUID) T {
-	agent := r.client.Get(fmt.Sprintf("%s/%s?key=%s", r.getUrl(), id.String(), r.ApiKey)).
-		Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
-	code, body, errors := agent.Bytes()
+func (r *RegistryRepository[T]) find(id uuid.UUID, params map[string]any) T {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("%s/%s?key=%s", r.getUrl(), id.String(), r.ApiKey))
+
+	if params != nil {
+		for key, value := range params {
+			builder.WriteString(fmt.Sprintf("&%s=%v", key, value))
+		}
+	}
+
+	var responseBody responseFindShape[T]
+
+	agent := r.client.Get(builder.String()).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+	code, _, errors := agent.Struct(&responseBody)
 
 	if len(errors) != 0 {
 		log.Println(errors)
+		return *new(T)
 	}
 
 	if code >= 400 {
 		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
+		return *new(T)
 	}
-
-	var responseBody responseFindShape[T]
-	_ = json.UnmarshalNoEscape(body, &responseBody)
 
 	return responseBody.Data
 }
@@ -80,20 +88,21 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 		}
 	}
 
+	var responseBody responseFindAllShape[T]
+
 	query := builder.String()
 	agent := r.client.Get(query).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
-	code, body, errors := agent.Bytes()
+	code, _, errors := agent.Struct(&responseBody)
 
 	if len(errors) != 0 {
 		log.Println(errors)
+		return nil
 	}
 
 	if code >= 400 {
 		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
+		return nil
 	}
-
-	var responseBody responseFindAllShape[T]
-	_ = json.UnmarshalNoEscape(body, &responseBody)
 
 	if responseBody.Meta.Pagination.Total <= responseBody.Meta.Pagination.Limit {
 		return responseBody.Data
@@ -103,11 +112,8 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 	result = append(result, responseBody.Data...)
 
 	for i := responseBody.Meta.Pagination.CurrentPage + 1; i <= responseBody.Meta.Pagination.TotalPages; i++ {
-		agent = r.client.Get(query+fmt.Sprintf("&page=%d", i)).
-			Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
-		_, body, _ = agent.Bytes()
-
-		_ = json.UnmarshalNoEscape(body, &responseBody)
+		agent = r.client.Get(query+fmt.Sprintf("&page=%d", i)).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+		agent.Struct(&responseBody)
 		result = append(result, responseBody.Data...)
 	}
 

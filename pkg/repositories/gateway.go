@@ -13,18 +13,17 @@ import (
 type GatewayRepository struct {
 	*RegistryRepository[*models.Gateway] `inject:""`
 
-	brokerRepository Repository[*models.Broker]            `inject:""`
-	cache            cache.CacheInterface[*models.Gateway] `inject:""`
+	cache       cache.CacheInterface[*models.Gateway] `inject:""`
+	brokerCache cache.CacheInterface[*models.Broker]  `inject:""`
 }
 
 func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
 		log.Printf("Gateway %s hitted cache\n", id.String())
-		item.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(item.BrokerId) }
 		return item
 	}
 
-	gateway := r.RegistryRepository.find(id)
+	gateway := r.RegistryRepository.find(id, map[string]any{"include": "broker"})
 
 	if gateway == nil {
 		return nil
@@ -32,7 +31,6 @@ func (r *GatewayRepository) Find(id uuid.UUID) *models.Gateway {
 
 	r.pushCache(gateway)
 
-	gateway.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(gateway.BrokerId) }
 	return gateway
 }
 
@@ -40,7 +38,7 @@ func (r *GatewayRepository) FindByIeee(gatewayIeee string) (item *models.Gateway
 	var err error
 
 	if item, err = r.cache.Get(context.Background(), gatewayIeee); errors.Is(err, new(store.NotFound)) {
-		gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": gatewayIeee})
+		gateways := r.RegistryRepository.findAll(map[string]any{"gatewayIeee": gatewayIeee, "include": "broker"})
 
 		if len(gateways) == 0 {
 			return nil
@@ -53,15 +51,11 @@ func (r *GatewayRepository) FindByIeee(gatewayIeee string) (item *models.Gateway
 		return nil
 	}
 
-	item.BrokerResolver = func() *models.Broker {
-		return r.brokerRepository.Find(item.BrokerId)
-	}
-
 	return
 }
 
 func (r *GatewayRepository) FindAll() []*models.Gateway {
-	gateways := r.RegistryRepository.findAll(map[string]any{"enabled": 1, "claimed": 1})
+	gateways := r.RegistryRepository.findAll(map[string]any{"enabled": 1, "claimed": 1, "include": "broker"})
 
 	if len(gateways) == 0 {
 		return gateways
@@ -69,8 +63,6 @@ func (r *GatewayRepository) FindAll() []*models.Gateway {
 
 	for _, gateway := range gateways {
 		r.pushCache(gateway)
-
-		gateway.BrokerResolver = func() *models.Broker { return r.brokerRepository.Find(gateway.BrokerId) }
 	}
 
 	return gateways
@@ -82,6 +74,10 @@ func (r *GatewayRepository) pushCache(gateway *models.Gateway) {
 	}
 
 	if err := r.cache.Set(context.Background(), gateway.GatewayIeee, gateway); err != nil {
+		log.Println(err)
+	}
+
+	if err := r.brokerCache.Set(context.Background(), gateway.BrokerId.String(), gateway.Broker); err != nil {
 		log.Println(err)
 	}
 }

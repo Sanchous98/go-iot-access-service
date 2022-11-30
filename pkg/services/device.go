@@ -8,18 +8,17 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"log"
 	"time"
 )
 
 type DeviceService struct {
-	aggregator *HandlerAggregator[*models.Gateway] `inject:""`
+	aggregator *HandlerAggregator `inject:""`
 }
 
 func (s *DeviceService) Open(device *models.Device, channels []int) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewLockOpenEvent(0, channels))
 
-	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, channels []int) error {
 	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
@@ -36,7 +35,7 @@ func (s *DeviceService) OpenSync(parent context.Context, device *models.Device, 
 func (s *DeviceService) Close(device *models.Device) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewLockCloseEvent(0))
 
-	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) CloseSync(parent context.Context, device *models.Device) error {
 	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
@@ -53,7 +52,7 @@ func (s *DeviceService) CloseSync(parent context.Context, device *models.Device)
 func (s *DeviceService) Auto(device *models.Device, recloseDelay byte, channels []int) mqtt.Token {
 	message, _ := json.Marshal(messages.NewLockAutoEvent(0, recloseDelay, channels))
 
-	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 2, false, message)
+	return s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetCommandsTopic(), 2, false, message)
 }
 func (s *DeviceService) AutoSync(parent context.Context, device *models.Device, recloseDelay byte, channels []int) error {
 	responseValidator := func(response messages.Response[messages.LockResponse]) bool {
@@ -67,37 +66,25 @@ func (s *DeviceService) AutoSync(parent context.Context, device *models.Device, 
 	return s.waitForResponse(device, ctx, func() mqtt.Token { return s.Auto(device, recloseDelay, channels) }, responseValidator)
 }
 
-func (s *DeviceService) AllowKeyAccess(device *models.Device, transactionId int, payload map[string]any) <-chan mqtt.Token {
+func (s *DeviceService) AllowKeyAccess(device *models.Device, transactionId int, payload map[string]any) mqtt.Token {
 	return s.KeyAuthorization(device, transactionId, payload["hashKey"].(string), payload["authType"].(messages.AuthType), messages.SuccessOnlineStatus, payload)
 }
 func (s *DeviceService) AllowKeyAccessSync(device *models.Device, transactionId int, payload map[string]any) error {
-	select {
-	case token := <-s.AllowKeyAccess(device, transactionId, payload):
-		token.Wait()
-		if err := token.Error(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	token := s.AllowKeyAccess(device, transactionId, payload)
+	token.Wait()
+	return token.Error()
 }
 
 func (s *DeviceService) DenyKeyAccessSync(device *models.Device, transactionId int, payload map[string]any) error {
-	select {
-	case token := <-s.DenyKeyAccess(device, transactionId, payload):
-		token.Wait()
-		if err := token.Error(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	token := s.DenyKeyAccess(device, transactionId, payload)
+	token.Wait()
+	return token.Error()
 }
-func (s *DeviceService) DenyKeyAccess(device *models.Device, transactionId int, payload map[string]any) <-chan mqtt.Token {
+func (s *DeviceService) DenyKeyAccess(device *models.Device, transactionId int, payload map[string]any) mqtt.Token {
 	return s.KeyAuthorization(device, transactionId, payload["hashKey"].(string), payload["authType"].(messages.AuthType), messages.FailedOnlineStatus, payload)
 }
 
-func (s *DeviceService) KeyAuthorization(device *models.Device, transactionId int, hashKey string, authType messages.AuthType, authStatus messages.AuthStatus, params map[string]any) <-chan mqtt.Token {
+func (s *DeviceService) KeyAuthorization(device *models.Device, transactionId int, hashKey string, authType messages.AuthType, authStatus messages.AuthStatus, params map[string]any) mqtt.Token {
 	auth := messages.Auth{
 		HashKey:    hashKey,
 		AuthType:   authType,
@@ -109,8 +96,8 @@ func (s *DeviceService) KeyAuthorization(device *models.Device, transactionId in
 	}
 
 	data, _ := json.Marshal(messages.NewAuthEvent(transactionId, auth))
-	log.Println(string(data))
-	return s.aggregator.Publish(device.GetGateway(), data, 0)
+
+	return s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetCommandsTopic(), 0, false, data)
 }
 
 func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Context, action func() mqtt.Token, lockOpened func(response messages.Response[messages.LockResponse]) bool) error {
@@ -154,7 +141,7 @@ func (s *DeviceService) waitForResponse(device *models.Device, ctx context.Conte
 	select {
 	case <-ctx.Done():
 		message, _ := json.MarshalNoEscape(messages.NewLockOfflineResponse())
-		s.aggregator.GetClient(device.GetGateway()).Publish(device.GetEventsTopic(), 2, false, message)
+		s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetEventsTopic(), 2, false, message)
 
 		return fiber.ErrGatewayTimeout
 	case err := <-errorChan:
@@ -168,7 +155,7 @@ func (s *DeviceService) EnqueueCommand(device *models.Device, name string, paylo
 
 func (s *DeviceService) Locate(device *models.Device, transactionId int) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewLocateRequest(transactionId))
-	return s.aggregator.GetClient(device.GetGateway()).Publish(device.GetCommandsTopic(), 0, false, message)
+	return s.aggregator.GetClient(device.GetOptions().ClientID).Publish(device.GetCommandsTopic(), 0, false, message)
 }
 
 func (s *DeviceService) LocateSync(device *models.Device, transactionId int) error {

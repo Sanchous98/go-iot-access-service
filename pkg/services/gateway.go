@@ -10,7 +10,7 @@ import (
 )
 
 type GatewayService struct {
-	aggregator *HandlerAggregator[*models.Gateway] `inject:""`
+	aggregator *HandlerAggregator `inject:""`
 }
 
 func (s *GatewayService) OpenNetwork(ctx context.Context, gateway *models.Gateway) error {
@@ -33,7 +33,7 @@ func (s *GatewayService) CloseNetwork(ctx context.Context, gateway *models.Gatew
 }
 func (s *GatewayService) GetNetworkState(ctx context.Context, gateway *models.Gateway) error {
 	message, _ := json.MarshalNoEscape(messages.NewNetworkInfoRequest(0))
-	token := s.aggregator.GetClient(gateway).Publish(gateway.GetCommandTopic(), 0, false, message)
+	token := s.aggregator.GetClient(gateway.GetOptions().ClientID).Publish(gateway.GetCommandTopic(), 0, false, message)
 
 	select {
 	case <-ctx.Done():
@@ -44,7 +44,7 @@ func (s *GatewayService) GetNetworkState(ctx context.Context, gateway *models.Ga
 }
 func (s *GatewayService) RemoveDevice(gateway *models.Gateway, deviceId string) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewRemoveDeviceRequest(0, deviceId))
-	return s.aggregator.GetClient(gateway).Publish(gateway.GetCommandTopic(), 0, false, message)
+	return s.aggregator.GetClient(gateway.GetOptions().ClientID).Publish(gateway.GetCommandTopic(), 0, false, message)
 }
 func (s *GatewayService) RemoveDeviceSync(ctx context.Context, gateway *models.Gateway, deviceId string) error {
 	token := s.RemoveDevice(gateway, deviceId)
@@ -60,5 +60,5 @@ func (s *GatewayService) RemoveDeviceSync(ctx context.Context, gateway *models.G
 func (s *GatewayService) updateNetworkState(gateway *models.Gateway, state messages.NetworkState) mqtt.Token {
 	message, _ := json.MarshalNoEscape(messages.NewUpdateNetworkState(0, state))
 
-	return s.aggregator.GetClient(gateway).Publish(gateway.GetCommandTopic(), 0, false, message)
+	return s.aggregator.GetClient(gateway.GetOptions().ClientID).Publish(gateway.GetCommandTopic(), 0, false, message)
 }

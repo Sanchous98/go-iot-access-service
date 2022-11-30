@@ -26,3 +26,38 @@ func Locate(repository repositories.DeviceRepository, service services.DeviceSer
 		return ctx.Status(fiber.StatusOK).SendString("Locate command has been sent!")
 	}
 }
+
+// FirmwareVersion => GET /devices/:deviceMacId/:gatewayMacId/firmware-version
+func FirmwareVersion(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+
+	}
+}
+
+// Config => GET /devices/:deviceMacId/:gatewayMacId/config
+func Config(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+
+	}
+}
+
+// DeviceCreateOfflineKey => POST /devices/:deviceId/keys
+func DeviceCreateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+
+	}
+}
+
+// DeviceUpdateOfflineKey => PUT /devices/:deviceId/keys
+func DeviceUpdateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+
+	}
+}
+
+// DeviceDeleteOfflineKey => DELETE /devices/:deviceId/keys
+func DeviceDeleteOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+
+	}
+}

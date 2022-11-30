@@ -20,7 +20,7 @@ func (r *BrokerRepository) Find(id uuid.UUID) *models.Broker {
 		return item
 	}
 
-	item := r.RegistryRepository.find(id)
+	item := r.RegistryRepository.find(id, nil)
 
 	if item == nil {
 		return nil

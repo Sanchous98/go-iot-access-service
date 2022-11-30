@@ -30,15 +30,15 @@ type Gateway struct {
 	//CreatedAt                  time.Time      `json:"createdAt"`
 	//UpdatedAt                  time.Time      `json:"updatedAt"`
 
-	BrokerResolver func() *Broker `json:"-"`
+	Broker *Broker `json:"broker"`
 }
 
 func (g *Gateway) GetId() uuid.UUID { return g.Id }
 func (g *Gateway) GetTopics() map[string]byte {
 	return map[string]byte{
-		fmt.Sprintf("$foursuites/gw/%s/info", g.GatewayIeee):          0,
-		fmt.Sprintf("$foursuites/gw/%s/dev/+/events", g.GatewayIeee):  0,
-		fmt.Sprintf("$foursuites/gw/%s/dev/+/actions", g.GatewayIeee): 0,
+		fmt.Sprintf("$foursuites/gw/%s/info", g.GatewayIeee):         0,
+		fmt.Sprintf("$foursuites/gw/%s/dev/+/events", g.GatewayIeee): 0,
+		//fmt.Sprintf("$foursuites/gw/%s/dev/+/actions", g.GatewayIeee): 0,
 	}
 }
 func (g *Gateway) GetCommandTopic() string {
@@ -48,7 +48,5 @@ func (g *Gateway) GetEventsTopic() string {
 	return fmt.Sprintf("$foursuites/gw/%s/info", g.GatewayIeee)
 }
 
-// GetOptions TODO: Reuse broker clients
-func (g *Gateway) GetOptions() *mqtt.ClientOptions { return g.GetBroker().GetOptions() }
-func (g *Gateway) GetBroker() *Broker              { return g.BrokerResolver() }
+func (g *Gateway) GetOptions() *mqtt.ClientOptions { return g.Broker.GetOptions() }
 func (*Gateway) GetResource() string               { return "gateways" }

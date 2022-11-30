@@ -1,16 +1,15 @@
 package services
 
 import (
+	"bitbucket.org/4suites/iot-service-golang/pkg/models"
 	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
 	"context"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/google/uuid"
 	"sync"
 	"unsafe"
 )
 
 type Connectable interface {
-	GetId() uuid.UUID
 	GetOptions() *mqtt.ClientOptions
 	GetTopics() map[string]byte
 }
@@ -30,85 +29,83 @@ type HandlerFunc func(client mqtt.Client, message mqtt.Message)
 func (h HandlerFunc) Handle(client mqtt.Client, message mqtt.Message) { h(client, message) }
 func (h HandlerFunc) CanHandle(mqtt.Client, mqtt.Message) bool        { return true }
 
-type HandlerAggregator[T Aggregatable] struct {
-	registeredHandlers []Handler                  `inject:"mqtt.message_handler"`
-	repository         repositories.Repository[T] `inject:""`
-	mu                 sync.RWMutex
+type HandlerAggregator struct {
+	handlersMutex      sync.RWMutex
+	registeredHandlers []Handler `inject:"mqtt.message_handler"`
+
+	brokers  repositories.Repository[*models.Broker]  `inject:""`
+	gateways repositories.Repository[*models.Gateway] `inject:""`
 
 	clients sync.Map
 }
 
-func (a *HandlerAggregator[T]) Register(handlers ...Handler) {
+func (a *HandlerAggregator) Register(handlers ...Handler) {
+	a.handlersMutex.Lock()
 	a.registeredHandlers = append(a.registeredHandlers, handlers...)
+	a.handlersMutex.Unlock()
 }
 
-func (a *HandlerAggregator[T]) Unregister(handler Handler) {
+func (a *HandlerAggregator) Unregister(handler Handler) {
 	for index, h := range a.registeredHandlers {
 		if sameHandler(handler, h) {
+			a.handlersMutex.Lock()
 			a.registeredHandlers = append(a.registeredHandlers[:index], a.registeredHandlers[index+1:]...)
+			a.handlersMutex.Unlock()
 		}
 	}
 }
 
-func (a *HandlerAggregator[T]) Publish(model T, message []byte, qos byte) <-chan mqtt.Token {
-	if client, ok := a.clients.Load(model.GetId()); ok {
-		results := make(chan mqtt.Token, len(model.GetTopics()))
-		for topic := range model.GetTopics() {
-			results <- client.(mqtt.Client).Publish(topic, qos, false, message)
-		}
-
-		close(results)
-		return results
-	}
-
-	return nil
-}
-
-// Launch TODO: Make clients' pool and reuse broker client in gateways
-func (a *HandlerAggregator[T]) Launch(context.Context) {
-	items := a.repository.FindAll()
-
-	for _, item := range items {
-		if len(item.GetTopics()) > 0 {
-			go func(item T) {
-				client := a.Subscribe(item.GetTopics(), item.GetOptions(), func(client mqtt.Client, message mqtt.Message) {
-					a.mu.RLock()
-					for _, handler := range a.registeredHandlers {
-						if handler.CanHandle(client, message) {
-							handler.Handle(client, message)
-						}
-					}
-					a.mu.RUnlock()
-				})
-				a.clients.Store(item.GetId(), client)
-			}(item)
-		}
-	}
-}
-
-func (a *HandlerAggregator[T]) GetClient(model T) mqtt.Client {
-	if client, ok := a.clients.Load(model.GetId()); ok {
+func (a *HandlerAggregator) GetClient(clientId string) mqtt.Client {
+	if client, ok := a.clients.Load(clientId); ok {
 		return client.(mqtt.Client)
 	}
 
 	return nil
 }
 
-func (a *HandlerAggregator[T]) Subscribe(topics map[string]byte, options *mqtt.ClientOptions, callback func(client mqtt.Client, message mqtt.Message)) mqtt.Client {
-	client := mqtt.NewClient(options)
-	token := client.Connect()
-	token.Wait()
-	client.SubscribeMultiple(topics, callback)
-	return client
+func (a *HandlerAggregator) Subscribe(topics map[string]byte, options *mqtt.ClientOptions) {
+	client, ok := a.clients.LoadOrStore(options.ClientID, mqtt.NewClient(options))
+
+	if !ok {
+		token := client.(mqtt.Client).Connect()
+		token.Wait()
+
+		if token.Error() != nil {
+			panic(token.Error())
+		}
+	}
+
+	client.(mqtt.Client).SubscribeMultiple(topics, func(client mqtt.Client, message mqtt.Message) {
+		a.handlersMutex.RLock()
+		for _, handler := range a.registeredHandlers {
+			if handler.CanHandle(client, message) {
+				go handler.Handle(client, message)
+			}
+		}
+		a.handlersMutex.RUnlock()
+	})
 }
 
-func (a *HandlerAggregator[T]) Unsubscribe(client mqtt.Client, topics map[string]byte) {
+func (a *HandlerAggregator) Unsubscribe(client mqtt.Client, topics map[string]byte) {
 	for topic := range topics {
 		client.Unsubscribe(topic)
 	}
 }
 
-func (a *HandlerAggregator[T]) Shutdown(ctx context.Context) {
+func (a *HandlerAggregator) Launch(context.Context) {
+	for _, item := range a.brokers.FindAll() {
+		if len(item.GetTopics()) > 0 {
+			go a.Subscribe(item.GetTopics(), item.GetOptions())
+		}
+	}
+	for _, item := range a.gateways.FindAll() {
+		if len(item.GetTopics()) > 0 {
+			go a.Subscribe(item.GetTopics(), item.GetOptions())
+		}
+	}
+}
+
+func (a *HandlerAggregator) Shutdown(context.Context) {
 	a.clients.Range(func(_, client any) bool {
 		go client.(mqtt.Client).Disconnect(250)
 		return true
