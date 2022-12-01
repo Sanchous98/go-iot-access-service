@@ -1,9 +1,14 @@
 package controllers
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
-	"bitbucket.org/4suites/iot-service-golang/pkg/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
+	services2 "bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
+	"github.com/eko/gocache/v3/cache"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"log"
 )
 
@@ -51,5 +56,21 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 		}
 
 		return ctx.SendStatus(200)
+	}
+}
+
+// DisconnectBroker => POST /broker/:brokerId/disconnect
+func DisconnectBroker(repository repositories.BrokerRepository, cache cache.CacheInterface[*entities.Broker], pool application.HandlerPool) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		id, _ := uuid.Parse(ctx.Params("brokerId"))
+		broker := repository.Find(id)
+		pool.DeleteClient(services2.GetClientOptions(broker).ClientID)
+
+		if err := cache.Delete(ctx.UserContext(), ctx.Params("brokerId")); err != nil {
+			log.Println(err)
+			return fiber.ErrInternalServerError
+		}
+
+		return ctx.SendStatus(fiber.StatusOK)
 	}
 }

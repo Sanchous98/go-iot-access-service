@@ -3,13 +3,18 @@ package main
 import (
 	"bitbucket.org/4suites/iot-service-golang/access/api"
 	"bitbucket.org/4suites/iot-service-golang/cmd/internal"
-	"bitbucket.org/4suites/iot-service-golang/pkg/cache"
-	"bitbucket.org/4suites/iot-service-golang/pkg/http"
-	"bitbucket.org/4suites/iot-service-golang/pkg/listeners"
-	"bitbucket.org/4suites/iot-service-golang/pkg/models"
-	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
-	"bitbucket.org/4suites/iot-service-golang/pkg/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application/listeners"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/cache"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/http"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
 	"context"
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/Sanchous98/go-di"
 	"github.com/allegro/bigcache/v3"
 	gocache "github.com/eko/gocache/v3/cache"
@@ -18,9 +23,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"log"
-	"strconv"
-	"time"
 )
 
 func main() {
@@ -47,30 +49,42 @@ func main() {
 
 		return db
 	})
-
 	app.Set(cacheFactory(ctx))
 
 	promMetrics := metrics.NewPrometheus("go-iot-access-service")
 
-	app.Set(func(container di.Container) gocache.CacheInterface[*models.Broker] {
-		return gocache.NewMetric[*models.Broker](promMetrics, cache.New[models.Broker](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
+	app.Set(func(container di.Container) gocache.CacheInterface[*entities.Broker] {
+		return gocache.NewMetric[*entities.Broker](promMetrics, cache.New[entities.Broker](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
-	app.Set(func(container di.Container) gocache.CacheInterface[*models.Device] {
-		return gocache.NewMetric[*models.Device](promMetrics, cache.New[models.Device](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
+	app.Set(func(container di.Container) gocache.CacheInterface[*entities.Device] {
+		return gocache.NewMetric[*entities.Device](promMetrics, cache.New[entities.Device](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
-	app.Set(func(container di.Container) gocache.CacheInterface[*models.Gateway] {
-		return gocache.NewMetric[*models.Gateway](promMetrics, cache.New[models.Gateway](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
-	})
-
-	app.Set(func(container di.Container) repositories.Repository[*models.Gateway] {
-		return container.Build(new(repositories.GatewayRepository)).(*repositories.GatewayRepository)
+	app.Set(func(container di.Container) gocache.CacheInterface[*entities.Gateway] {
+		return gocache.NewMetric[*entities.Gateway](promMetrics, cache.New[entities.Gateway](container.Get(new(store.StoreInterface)).(store.StoreInterface)))
 	})
 
-	app.Set(func(container di.Container) repositories.Repository[*models.Broker] {
-		return container.Build(new(repositories.BrokerRepository)).(*repositories.BrokerRepository)
-	})
+	app.Set(new(repositories.GatewayRepository))
+	app.Set(new(repositories.BrokerRepository))
+	app.Set(new(repositories.DeviceRepository))
 
-	app.Set(new(services.HandlerAggregator))
+	app.Set(func(container di.Container) application.Repository[*entities.Device] {
+		return container.Get((*repositories.DeviceRepository)(nil)).(*repositories.DeviceRepository)
+	})
+	app.Set(func(container di.Container) application.Repository[*entities.Broker] {
+		return container.Get((*repositories.BrokerRepository)(nil)).(*repositories.BrokerRepository)
+	})
+	app.Set(func(container di.Container) application.Repository[*entities.Gateway] {
+		return container.Get((*repositories.GatewayRepository)(nil)).(*repositories.GatewayRepository)
+	})
+	app.Set(func(container di.Container) application.DeviceRepository {
+		return container.Get((*repositories.DeviceRepository)(nil)).(*repositories.DeviceRepository)
+	})
+	app.Set(func(container di.Container) application.GatewayRepository {
+		return container.Get((*repositories.GatewayRepository)(nil)).(*repositories.GatewayRepository)
+	})
+	app.Set(func(container di.Container) application.HandlerPool {
+		return container.Build(new(services.HandlerAggregator)).(*services.HandlerAggregator)
+	})
 	app.Set(new(listeners.VerifyOnlineHandler), "mqtt.message_handler")
 
 	app.Run(app.LoadEnv)

@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
-	"bitbucket.org/4suites/iot-service-golang/pkg/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"github.com/gofiber/fiber/v2"
 	"log"
 )

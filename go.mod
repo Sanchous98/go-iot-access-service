@@ -8,7 +8,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/eko/gocache/v3 v3.1.2
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/goccy/go-json v0.9.11
+	github.com/goccy/go-json v0.10.0
 	github.com/goccy/go-reflect v1.2.0
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/google/uuid v1.3.0

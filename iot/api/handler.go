@@ -2,9 +2,9 @@ package api
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/iot/api/controllers"
-	"bitbucket.org/4suites/iot-service-golang/pkg/http/middleware"
-	"bitbucket.org/4suites/iot-service-golang/pkg/repositories"
-	"bitbucket.org/4suites/iot-service-golang/pkg/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/http/middleware"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
@@ -53,6 +53,36 @@ func (h *IotApiHandler) RegisterRoutes(app *fiber.App) {
 			"/locate",
 			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
 			controllers.Locate(h.deviceRepository, h.deviceService),
+		)
+
+		devices.Get(
+			"/:gatewayId/firmware-version",
+			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
+			controllers.FirmwareVersion(h.deviceRepository, h.deviceService),
+		)
+
+		devices.Get(
+			"/:gatewayId/config",
+			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
+			controllers.Config(h.deviceRepository, h.deviceService),
+		)
+
+		devices.Post(
+			"/keys",
+			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
+			controllers.DeviceCreateOfflineKey(h.deviceRepository, h.deviceService),
+		)
+
+		devices.Put(
+			"/keys/:hashKey",
+			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
+			controllers.DeviceUpdateOfflineKey(h.deviceRepository, h.deviceService),
+		)
+
+		devices.Delete(
+			"/keys",
+			middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
+			controllers.DeviceDeleteOfflineKey(h.deviceRepository, h.deviceService),
 		)
 
 		app.Post(
