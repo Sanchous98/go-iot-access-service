@@ -90,13 +90,13 @@ func (a *HandlerAggregator) Unsubscribe(client mqtt.Client, topics map[string]by
 func (a *HandlerAggregator) Launch(context.Context) {
 	for _, item := range a.brokers.FindAll() {
 		if len(item.GetTopics()) > 0 {
-			go a.Subscribe(item.GetTopics(), item.GetOptions())
+			go a.Subscribe(item.GetTopics(), GetClientOptions(item))
 		}
 	}
 
 	for _, item := range a.gateways.FindAll() {
 		if len(item.GetTopics()) > 0 {
-			go a.Subscribe(item.GetTopics(), item.GetOptions())
+			go a.Subscribe(item.GetTopics(), GetClientOptions(item.Broker))
 		}
 	}
 }

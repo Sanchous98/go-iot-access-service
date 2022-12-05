@@ -34,20 +34,20 @@ type LockResponse struct {
 }
 
 func NewLockOpenEvent(transactionId int, channelIds []int) (event EventRequest[LockAuto]) {
-	event.TransactionId = transactionId
+	event.Event.TransactionId = transactionId
 	event.Event.EventType = LockActionOpen
 	event.Event.Payload.ChannelIds = channelIds
 	return
 }
 
 func NewLockCloseEvent(transactionId int) (event EventRequest[EmptyPayload]) {
-	event.TransactionId = transactionId
+	event.Event.TransactionId = transactionId
 	event.Event.EventType = LockActionClose
 	return
 }
 
 func NewLockAutoEvent(transactionId int, delay byte, channelIds []int) (event EventRequest[LockAuto]) {
-	event.TransactionId = transactionId
+	event.Event.TransactionId = transactionId
 	event.Event.EventType = LockActionAuto
 	event.Event.Payload.RecloseDelay = delay
 	event.Event.Payload.ChannelIds = channelIds

@@ -3,7 +3,7 @@ package repositories
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
 	"context"
-	"github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/google/uuid"
 	"log"
 )

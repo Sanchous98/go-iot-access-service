@@ -2,7 +2,7 @@ package cache
 
 import (
 	"context"
-	"github.com/eko/gocache/v3/store"
+	"github.com/eko/gocache/lib/v4/store"
 	"time"
 )
 

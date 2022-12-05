@@ -7,7 +7,7 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/http/middleware"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
-	"github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )

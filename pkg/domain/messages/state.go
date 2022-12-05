@@ -17,7 +17,7 @@ type UpdateNetworkState struct {
 }
 
 func NewUpdateNetworkState(transactionId int, state NetworkState) (event EventRequest[UpdateNetworkState]) {
-	event.TransactionId = transactionId
+	event.Event.TransactionId = transactionId
 	event.Event.EventType = UpdateNetworkType
 	event.Event.Payload.Action = state
 

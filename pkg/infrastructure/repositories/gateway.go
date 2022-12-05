@@ -4,8 +4,8 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
 	"context"
 	"errors"
-	"github.com/eko/gocache/v3/cache"
-	"github.com/eko/gocache/v3/store"
+	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/store"
 	"github.com/google/uuid"
 	"log"
 )

@@ -11,15 +11,17 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
 	"context"
+	"github.com/allegro/bigcache/v3"
 	"log"
 	"strconv"
 	"time"
 
 	"github.com/Sanchous98/go-di"
-	"github.com/allegro/bigcache/v3"
-	gocache "github.com/eko/gocache/v3/cache"
-	"github.com/eko/gocache/v3/metrics"
-	"github.com/eko/gocache/v3/store"
+	gocache "github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/metrics"
+	"github.com/eko/gocache/lib/v4/store"
+	bigCacheStore "github.com/eko/gocache/store/bigcache/v4"
+	redisStore "github.com/eko/gocache/store/redis/v4"
 	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -102,7 +104,7 @@ func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.St
 				panic(err)
 			}
 
-			return store.NewBigcache(db)
+			return bigCacheStore.NewBigcache(db)
 		case "redis":
 			db, err := strconv.Atoi(environment.GetParam("REDIS_DB"))
 
@@ -110,7 +112,7 @@ func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.St
 				panic(err)
 			}
 
-			return store.NewRedis(redis.NewClient(&redis.Options{
+			return redisStore.NewRedis(redis.NewClient(&redis.Options{
 				Addr: environment.GetParam("REDIS_HOST"),
 				DB:   db,
 			}), store.WithExpiration(1*time.Hour))

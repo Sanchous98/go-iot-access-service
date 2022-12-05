@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/eko/gocache/v3/store"
+	"github.com/eko/gocache/lib/v4/store"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2/utils"
 	"log"
