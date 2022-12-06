@@ -3,28 +3,29 @@ package services
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/messages"
-	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/unsafe"
 	"context"
 	"errors"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"log"
 	"time"
 )
 
 type DeviceService struct {
-	pool application.HandlerPool `inject:""`
+	pool application.ClientPool `inject:""`
+	log  logger.Logger          `inject:""`
 }
 
 func (s *DeviceService) Open(device *entities.Device, channels []int) (mqtt.Token, error) {
-	message, _ := json.MarshalNoEscape(messages.NewLockOpenEvent(0, channels))
+	message := unsafe.Suppress(json.MarshalNoEscape(messages.NewLockOpenEvent(0, channels)))
 
-	client := s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID)
+	client := s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 
 	if client == nil {
-		log.Printf("Client %s does not exist\n", services.GetClientOptions(device.Gateway.Broker).ClientID)
+		s.log.Errorf("Client %s does not exist\n", application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 		return nil, fiber.ErrInternalServerError
 	}
 
@@ -43,16 +44,16 @@ func (s *DeviceService) OpenSync(parent context.Context, device *entities.Device
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Open(device, channels) })
+	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Open(device, channels) }, s.log)
 }
 
 func (s *DeviceService) Close(device *entities.Device) (mqtt.Token, error) {
-	message, _ := json.MarshalNoEscape(messages.NewLockCloseEvent(0))
+	message := unsafe.Suppress(json.MarshalNoEscape(messages.NewLockCloseEvent(0)))
 
-	client := s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID)
+	client := s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 
 	if client == nil {
-		log.Printf("Client %s does not exist\n", services.GetClientOptions(device.Gateway.Broker).ClientID)
+		s.log.Errorf("Client %s does not exist\n", application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 		return nil, fiber.ErrInternalServerError
 	}
 
@@ -71,16 +72,16 @@ func (s *DeviceService) CloseSync(parent context.Context, device *entities.Devic
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Close(device) })
+	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Close(device) }, s.log)
 }
 
 func (s *DeviceService) Auto(device *entities.Device, recloseDelay byte, channels []int) (mqtt.Token, error) {
-	message, _ := json.Marshal(messages.NewLockAutoEvent(0, recloseDelay, channels))
+	message := unsafe.Suppress(json.MarshalNoEscape(messages.NewLockAutoEvent(0, recloseDelay, channels)))
 
-	client := s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID)
+	client := s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 
 	if client == nil {
-		log.Printf("Client %s does not exist\n", services.GetClientOptions(device.Gateway.Broker).ClientID)
+		s.log.Errorf("Client %s does not exist\n", application.GetClientOptions(s.log, device.Gateway.Broker).ClientID)
 		return nil, fiber.ErrInternalServerError
 	}
 
@@ -99,7 +100,7 @@ func (s *DeviceService) AutoSync(parent context.Context, device *entities.Device
 	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	defer cancel()
 
-	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Auto(device, recloseDelay, channels) })
+	return mqttRequestSync[messages.Response[messages.LockResponse]](s, device, ctx, responseValidator, func() (mqtt.Token, error) { return s.Auto(device, recloseDelay, channels) }, s.log)
 }
 
 func (s *DeviceService) AllowKeyAccess(device *entities.Device, transactionId int, auth messages.Auth) mqtt.Token {
@@ -123,9 +124,9 @@ func (s *DeviceService) DenyKeyAccess(device *entities.Device, transactionId int
 }
 
 func (s *DeviceService) keyAuthorization(device *entities.Device, transactionId int, auth messages.Auth) mqtt.Token {
-	data, _ := json.Marshal(messages.NewAuthEvent(transactionId, auth))
+	data := unsafe.Suppress(json.MarshalNoEscape(messages.NewAuthEvent(transactionId, auth)))
 
-	return s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID).
+	return s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID).
 		Publish(device.GetCommandsTopic(), 0, false, data)
 }
 
@@ -134,8 +135,8 @@ func (s *DeviceService) EnqueueCommand(device *entities.Device, name string, pay
 }
 
 func (s *DeviceService) Locate(device *entities.Device, transactionId int) mqtt.Token {
-	message, _ := json.MarshalNoEscape(messages.NewLocateRequest(transactionId))
-	return s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID).
+	message := unsafe.Suppress(json.MarshalNoEscape(messages.NewLocateRequest(transactionId)))
+	return s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID).
 		Publish(device.GetCommandsTopic(), 0, false, message)
 }
 func (s *DeviceService) LocateSync(ctx context.Context, device *entities.Device, transactionId int) error {
@@ -150,9 +151,9 @@ func (s *DeviceService) LocateSync(ctx context.Context, device *entities.Device,
 }
 
 func (s *DeviceService) GetFirmware(device *entities.Device) mqtt.Token {
-	message, _ := json.MarshalNoEscape(messages.NewFirmwareVersionRequest(0))
+	message := unsafe.Suppress(json.MarshalNoEscape(messages.NewFirmwareVersionRequest(0)))
 
-	return s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID).
+	return s.pool.GetClient(application.GetClientOptions(s.log, device.Gateway.Broker).ClientID).
 		Publish(device.GetCommandsTopic(), 0, false, message)
 }
 func (s *DeviceService) GetFirmwareSync(parent context.Context, device *entities.Device) (string, error) {
@@ -172,51 +173,4 @@ func (s *DeviceService) ReadConfigSync(ctx context.Context, device *entities.Dev
 }
 
 func (s *DeviceService) ClearQueueForDevice(ctx context.Context, device *entities.Device) {
-}
-
-func mqttRequestSync[T any](s *DeviceService, device *entities.Device, ctx context.Context, validate func(T) error, action func() (mqtt.Token, error)) error {
-	errorChan := make(chan error)
-
-	handler := application.HandlerFunc(func(client mqtt.Client, message mqtt.Message) {
-		if message.Topic() != device.GetEventsTopic() {
-			return
-		}
-
-		var response T
-		if err := json.UnmarshalNoEscape(message.Payload(), &response); err != nil {
-			errorChan <- err
-			return
-		}
-
-		if err := validate(response); err != nil {
-			errorChan <- err
-			return
-		}
-
-		errorChan <- nil
-	})
-
-	s.pool.Register(handler)
-	defer s.pool.Unregister(handler)
-	token, err := action()
-
-	if err != nil {
-		return err
-	}
-
-	token.Wait()
-
-	if err = token.Error(); err != nil {
-		return err
-	}
-
-	select {
-	case <-ctx.Done():
-		message, _ := json.MarshalNoEscape(messages.NewLockOfflineResponse())
-		s.pool.GetClient(services.GetClientOptions(device.Gateway.Broker).ClientID).Publish(device.GetEventsTopic(), 2, false, message)
-
-		return fiber.ErrGatewayTimeout
-	case err = <-errorChan:
-		return err
-	}
 }

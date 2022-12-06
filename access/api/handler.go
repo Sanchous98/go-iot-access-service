@@ -5,6 +5,7 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
 	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/http/middleware"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -19,18 +20,20 @@ type AccessApiHandler struct {
 
 	brokerRepository repositories.BrokerRepository          `inject:""`
 	brokerCache      cache.CacheInterface[*entities.Broker] `inject:""`
-	pool             application.HandlerPool                `inject:""`
+	pool             application.ClientPool                 `inject:""`
+
+	log logger.Logger `inject:""`
 }
 
 func (h *AccessApiHandler) RegisterRoutes(app *fiber.App) {
 	app.Post(
 		"/devices/:deviceId/:action",
 		checkPath,
-		middleware.ConvertCoreDeviceIdToRegistryMac(h.db),
-		controllers.Action(h.service, h.repository),
+		middleware.ConvertCoreDeviceIdToRegistryMac(h.db, h.log),
+		controllers.Action(h.service, h.repository, h.log),
 	)
 
-	app.Post("/broker/:brokerId/disconnect", controllers.DisconnectBroker(h.brokerRepository, h.brokerCache, h.pool))
+	app.Post("/broker/:brokerId/disconnect", controllers.DisconnectBroker(h.brokerRepository, h.brokerCache, h.pool, h.log))
 }
 
 func checkPath(ctx *fiber.Ctx) error {

@@ -3,27 +3,31 @@ package listeners
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
 	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/messages"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/utils"
-	"log"
 	"regexp"
 	"strings"
 )
 
 type VerifyOnlineHandler struct {
-	regexp            *regexp.Regexp
+	coreApiKey     string `env:"CORE_API_SERVICE_ACCESS_TOKEN"`
+	coreApiBaseUrl string `env:"CORE_API_SERVICE_URL"`
+
 	deviceRepository  application.DeviceRepository  `inject:""`
 	gatewayRepository application.GatewayRepository `inject:""`
-	coreApiBaseUrl    string                        `env:"CORE_API_SERVICE_URL"`
-	coreApiKey        string                        `env:"CORE_API_SERVICE_ACCESS_TOKEN"`
 	deviceService     *services.DeviceService       `inject:""`
-	client            *fiber.Client
+	log               logger.Logger                 `inject:""`
+
+	regexp *regexp.Regexp
+	client *fiber.Client
 }
 
 func (h *VerifyOnlineHandler) Constructor() {
+	// TODO: avoid regexp. Memory allocations
 	h.regexp = regexp.MustCompile(`^\$foursuites/gw/(.+)/dev/(.+)/events$`)
 	h.client = fiber.AcquireClient()
 }
@@ -53,7 +57,7 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 		})
 
 		if err != nil {
-			mqtt.ERROR.Println(err)
+			h.log.Errorln(err)
 		}
 
 		return
@@ -66,7 +70,7 @@ func (h *VerifyOnlineHandler) Handle(_ mqtt.Client, message mqtt.Message) {
 	})
 
 	if err != nil {
-		mqtt.ERROR.Println(err)
+		h.log.Errorln(err)
 	}
 }
 
@@ -107,12 +111,12 @@ func (h *VerifyOnlineHandler) authorizationRequest(deviceMacId, gatewayMacId, ha
 	fiber.ReleaseArgs(arg)
 
 	if len(errors) != 0 {
-		log.Println(errors)
+		h.log.Errorln(errors)
 		return nil
 	}
 
 	if code >= 400 {
-		log.Println(utils.UnsafeString(body))
+		h.log.Debugf(utils.UnsafeString(body))
 		return nil
 	}
 

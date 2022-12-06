@@ -4,12 +4,11 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
 	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
-	services2 "bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"log"
 )
 
 type requestShape struct {
@@ -18,12 +17,12 @@ type requestShape struct {
 }
 
 // Action => POST /devices/:deviceId/:action
-func Action(service services.DeviceService, repository repositories.DeviceRepository) fiber.Handler {
+func Action(service services.DeviceService, repository repositories.DeviceRepository, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
-			log.Printf("Device %s not found\n", ctx.Params("deviceId"))
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
@@ -46,7 +45,7 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 		}
 
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 
 			if _, ok := err.(*fiber.Error); ok {
 				return err
@@ -60,14 +59,14 @@ func Action(service services.DeviceService, repository repositories.DeviceReposi
 }
 
 // DisconnectBroker => POST /broker/:brokerId/disconnect
-func DisconnectBroker(repository repositories.BrokerRepository, cache cache.CacheInterface[*entities.Broker], pool application.HandlerPool) fiber.Handler {
+func DisconnectBroker(repository repositories.BrokerRepository, cache cache.CacheInterface[*entities.Broker], pool application.ClientPool, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		id, _ := uuid.Parse(ctx.Params("brokerId"))
 		broker := repository.Find(id)
-		pool.DeleteClient(services2.GetClientOptions(broker).ClientID)
+		pool.DeleteClient(application.GetClientOptions(log, broker).ClientID)
 
 		if err := cache.Delete(ctx.UserContext(), ctx.Params("brokerId")); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 

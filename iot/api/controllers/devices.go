@@ -2,23 +2,23 @@ package controllers
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"github.com/gofiber/fiber/v2"
-	"log"
 )
 
 // Locate => POST /devices/:deviceId/locate
-func Locate(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func Locate(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
-			log.Printf("Device %s not found\n", ctx.Params("deviceId"))
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
 		if err := service.LocateSync(ctx.UserContext(), device, 0); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 
 			return fiber.ErrInternalServerError
 		}
@@ -28,18 +28,19 @@ func Locate(repository repositories.DeviceRepository, service services.DeviceSer
 }
 
 // FirmwareVersion => GET /devices/:deviceId/:gatewayId/firmware-version
-func FirmwareVersion(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func FirmwareVersion(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacIdAndGatewayIeee(ctx.Params("deviceId"), ctx.Params("gatewayId"))
 
 		if device == nil {
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
 		_, err := service.GetFirmwareSync(ctx.UserContext(), device)
 
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 
@@ -48,16 +49,17 @@ func FirmwareVersion(repository repositories.DeviceRepository, service services.
 }
 
 // Config => GET /devices/:deviceId/:gatewayId/config
-func Config(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func Config(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacIdAndGatewayIeee(ctx.Params("deviceId"), ctx.Params("gatewayId"))
 
 		if device == nil {
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
 		if err := service.ReadConfigSync(ctx.UserContext(), device); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 
@@ -66,11 +68,12 @@ func Config(repository repositories.DeviceRepository, service services.DeviceSer
 }
 
 // DeviceCreateOfflineKey => POST /devices/:deviceId/keys
-func DeviceCreateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func DeviceCreateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
@@ -80,7 +83,7 @@ func DeviceCreateOfflineKey(repository repositories.DeviceRepository, service se
 		commandId, err := service.EnqueueCommand(device, "createKey", data)
 
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 
@@ -93,11 +96,12 @@ func DeviceCreateOfflineKey(repository repositories.DeviceRepository, service se
 }
 
 // DeviceUpdateOfflineKey => PUT /devices/:deviceId/keys/:hashKey
-func DeviceUpdateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func DeviceUpdateOfflineKey(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
@@ -108,7 +112,7 @@ func DeviceUpdateOfflineKey(repository repositories.DeviceRepository, service se
 		commandId, err := service.EnqueueCommand(device, "updateKey", data)
 
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 
@@ -121,11 +125,12 @@ func DeviceUpdateOfflineKey(repository repositories.DeviceRepository, service se
 }
 
 // DeviceDeleteOfflineKey => DELETE /devices/:deviceId/keys
-func DeviceDeleteOfflineKey(repository repositories.DeviceRepository, service services.DeviceService) fiber.Handler {
+func DeviceDeleteOfflineKey(repository repositories.DeviceRepository, service services.DeviceService, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		device := repository.FindByMacId(ctx.Params("deviceId"))
 
 		if device == nil {
+			log.Debugf("Device %s not found\n", ctx.Params("deviceId"))
 			return fiber.ErrNotFound
 		}
 
@@ -139,7 +144,7 @@ func DeviceDeleteOfflineKey(repository repositories.DeviceRepository, service se
 		commandId, err := service.EnqueueCommand(device, "deleteKey", data)
 
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return fiber.ErrInternalServerError
 		}
 

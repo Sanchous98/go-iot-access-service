@@ -1,9 +1,9 @@
 package http
 
 import (
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"context"
 	"github.com/gofiber/fiber/v2"
-	"log"
 )
 
 type Handler interface {
@@ -15,7 +15,8 @@ type ServerApi struct {
 	host string `env:"API_HOST"`
 	port string `env:"API_PORT"`
 
-	handlers []Handler `inject:"api.handler"`
+	handlers []Handler     `inject:"api.handler"`
+	log      logger.Logger `inject:""`
 }
 
 func (s *ServerApi) Constructor() {
@@ -38,8 +39,8 @@ func (s *ServerApi) Launch(context context.Context) {
 
 func (s *ServerApi) Shutdown(context.Context) {
 	if err := s.App.Shutdown(); err != nil {
-		log.Println(err)
+		s.log.Errorln(err)
 	} else {
-		log.Println("Fiber has successfully shut down")
+		s.log.Infoln("Fiber has successfully shut down")
 	}
 }

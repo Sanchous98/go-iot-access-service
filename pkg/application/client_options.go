@@ -1,26 +1,27 @@
-package services
+package application
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"crypto/tls"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofiber/fiber/v2/utils"
-	"log"
 	"sync"
 	"time"
 )
 
 var optionsPool sync.Map
 
-func GetClientOptions(b *entities.Broker) *mqtt.ClientOptions {
+func GetClientOptions(log logger.Logger, b *entities.Broker) *mqtt.ClientOptions {
 	if clientOptions, ok := optionsPool.Load(b.Id.String()); ok {
 		return clientOptions.(*mqtt.ClientOptions)
 	}
 
 	cert, _ := tls.X509KeyPair(utils.UnsafeBytes(b.ClientCertificate), utils.UnsafeBytes(b.ClientKey))
-	clientOptions := mqtt.NewClientOptions()
-	clientOptions.AddBroker(fmt.Sprintf("%s:%d", b.Host, b.Port)).
+
+	return mqtt.NewClientOptions().
+		AddBroker(fmt.Sprintf("%s:%d", b.Host, b.Port)).
 		SetClientID(fmt.Sprintf("4suites-broker-%s", b.Id.String())).
 		SetProtocolVersion(4).
 		SetTLSConfig(&tls.Config{
@@ -34,11 +35,9 @@ func GetClientOptions(b *entities.Broker) *mqtt.ClientOptions {
 		SetConnectRetryInterval(5 * time.Second).
 		SetOrderMatters(false).
 		SetReconnectingHandler(func(mqtt.Client, *mqtt.ClientOptions) {
-			log.Printf("Broker %s reconnecting\n", b.Id)
+			log.Warnf("Broker %s reconnecting\n", b.Id)
 		}).
 		SetOnConnectHandler(func(mqtt.Client) {
-			log.Printf("Broker %s connected\n", b.Id)
+			log.Warnf("Broker %s connected\n", b.Id)
 		})
-
-	return clientOptions
 }

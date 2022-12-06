@@ -3,12 +3,10 @@ package repositories
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"context"
-	"errors"
 	"github.com/eko/gocache/lib/v4/cache"
-	"github.com/eko/gocache/lib/v4/store"
 	"github.com/google/uuid"
-	"log"
 )
 
 type DeviceRepository struct {
@@ -18,33 +16,41 @@ type DeviceRepository struct {
 	cache             cache.CacheInterface[*entities.Device]    `inject:""`
 	brokerCache       cache.CacheInterface[*entities.Broker]    `inject:""`
 	gatewayCache      cache.CacheInterface[*entities.Gateway]   `inject:""`
+
+	log logger.Logger `inject:""`
 }
 
-func (r *DeviceRepository) Find(id uuid.UUID) *entities.Device {
-	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
-		log.Printf("Device %s hitted cache\n", id.String())
-		return item
+func (r *DeviceRepository) Find(id uuid.UUID) (item *entities.Device) {
+	var err error
+
+	if item, err = r.cache.Get(context.Background(), id.String()); err != nil {
+		item = r.RegistryRepository.find(id, map[string]any{"include": "gateway.broker"})
+
+		if item == nil {
+			r.log.Debugf("Device %s not found\n", id.String())
+			return
+		}
+
+		r.pushCache(item)
+	} else {
+		r.log.Infof("Device %s hit cache\n", id.String())
 	}
 
-	device := r.RegistryRepository.find(id, map[string]any{"include": "gateway.broker"})
-
-	if device == nil {
-		return nil
-	}
-
-	r.pushCache(device)
-
-	return device
+	return item
 }
 
 func (r *DeviceRepository) FindByMacId(macId string) (item *entities.Device) {
 	var err error
 
-	if item, err = r.cache.Get(context.Background(), macId); errors.Is(err, new(store.NotFound)) {
+	if item, err = r.cache.Get(context.Background(), macId); err != nil {
 		item = r.FindOneBy(map[string]any{"macId": macId, "include": "gateway.broker"})
-	} else if err != nil {
-		log.Println(err)
-		return nil
+
+		if item == nil {
+			r.log.Debugf("Device %s not found\n", macId)
+			return
+		}
+	} else {
+		r.log.Infof("Device %s hit cache\n", macId)
 	}
 
 	return
@@ -53,11 +59,15 @@ func (r *DeviceRepository) FindByMacId(macId string) (item *entities.Device) {
 func (r *DeviceRepository) FindByMacIdAndGatewayIeee(deviceMacId string, gatewayIeee string) (item *entities.Device) {
 	var err error
 
-	if item, err = r.cache.Get(context.Background(), deviceMacId+gatewayIeee); errors.Is(err, new(store.NotFound)) {
+	if item, err = r.cache.Get(context.Background(), deviceMacId+gatewayIeee); err != nil {
 		item = r.FindOneBy(map[string]any{"macId": deviceMacId, "include": "gateway.broker", "gateway.gatewayIeee": gatewayIeee})
-	} else if err != nil {
-		log.Println(err)
-		return nil
+
+		if item == nil {
+			r.log.Debugf("Device %s on gateway %s not found\n", deviceMacId, gatewayIeee)
+			return
+		}
+	} else {
+		r.log.Infof("Device %s on gateway %s hit cache\n", deviceMacId, gatewayIeee)
 	}
 
 	return
@@ -93,26 +103,26 @@ func (r *DeviceRepository) FindBy(params map[string]any) []*entities.Device {
 
 func (r *DeviceRepository) pushCache(device *entities.Device) {
 	if err := r.cache.Set(context.Background(), device.Id.String(), device); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 
 	if err := r.cache.Set(context.Background(), device.MacId, device); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 
 	if err := r.cache.Set(context.Background(), device.MacId+device.Gateway.GatewayIeee, device); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 
 	if err := r.gatewayCache.Set(context.Background(), device.GatewayId.String(), device.Gateway); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 
 	if err := r.gatewayCache.Set(context.Background(), device.Gateway.GatewayIeee, device.Gateway); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 
 	if err := r.brokerCache.Set(context.Background(), device.Gateway.BrokerId.String(), device.Gateway.Broker); err != nil {
-		log.Println(err)
+		r.log.Errorln(err)
 	}
 }

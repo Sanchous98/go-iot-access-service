@@ -3,7 +3,7 @@ module bitbucket.org/4suites/iot-service-golang
 go 1.19
 
 require (
-	github.com/Sanchous98/go-di v1.5.5
+	github.com/Sanchous98/go-di v1.5.8
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/eko/gocache/lib/v4 v4.1.2
@@ -14,6 +14,8 @@ require (
 	github.com/goccy/go-reflect v1.2.0
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/google/uuid v1.3.0
+	go.uber.org/zap v1.24.0
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.4.4
 	gorm.io/gorm v1.24.2
 )
@@ -43,6 +45,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.41.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect

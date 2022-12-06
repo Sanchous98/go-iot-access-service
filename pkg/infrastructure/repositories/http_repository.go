@@ -2,10 +2,10 @@ package repositories
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/application"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"log"
 	"strings"
 )
 
@@ -34,7 +34,10 @@ type responseFindAllShape[T application.WithResource] struct {
 type RegistryRepository[T application.WithResource] struct {
 	ApiBaseUrl string `env:"REGISTRY_API_URL"`
 	ApiKey     string `env:"REGISTRY_API_KEY"`
-	client     *fiber.Client
+
+	log logger.Logger `inject:""`
+
+	client *fiber.Client
 }
 
 func (r *RegistryRepository[T]) Constructor() {
@@ -67,12 +70,12 @@ func (r *RegistryRepository[T]) find(id uuid.UUID, params map[string]any) T {
 	code, _, errors := agent.Struct(&responseBody)
 
 	if len(errors) != 0 {
-		log.Println(errors)
+		r.log.Errorln(errors)
 		return *new(T)
 	}
 
 	if code >= 400 {
-		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
+		r.log.Debugf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
 		return *new(T)
 	}
 
@@ -95,13 +98,13 @@ func (r *RegistryRepository[T]) findAll(condition map[string]any) []T {
 	agent := r.client.Get(query).Add(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	code, _, errors := agent.Struct(&responseBody)
 
-	if len(errors) != 0 {
-		log.Println(errors)
+	if code >= 400 {
+		r.log.Debugf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().URI().String())
 		return nil
 	}
 
-	if code >= 400 {
-		log.Printf("Request failed with HTTP code: %d\n, URL: %s", code, agent.Request().String())
+	if len(errors) != 0 {
+		r.log.Errorln(errors)
 		return nil
 	}
 

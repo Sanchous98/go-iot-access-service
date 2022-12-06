@@ -1,10 +1,10 @@
 package middleware
 
 import (
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"github.com/goccy/go-reflect"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
-	"log"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -22,26 +22,26 @@ func (device) TableName() string {
 }
 
 // TODO: Remove after demo
-func convertCoreApiIdToRegistryMacId(db *gorm.DB, deviceCoreId int) string {
+func convertCoreApiIdToRegistryMacId(db *gorm.DB, deviceCoreId int, log logger.Logger) string {
 	if item, hit := cache.Load(deviceCoreId); hit {
 		return item.(string)
 	}
 
 	d := device{Id: deviceCoreId}
 	if err := db.First(&d, d).Error; err != nil {
-		log.Println(err)
+		log.Errorln(err)
 		return ""
 	}
 
 	return d.MacId
 }
-func ConvertCoreDeviceIdToRegistryMac(db *gorm.DB) fiber.Handler {
+func ConvertCoreDeviceIdToRegistryMac(db *gorm.DB, log logger.Logger) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		var deviceId string
 		coreDeviceId, err := strconv.Atoi(ctx.Params("deviceId", ""))
 
 		if err == nil {
-			deviceId = convertCoreApiIdToRegistryMacId(db, coreDeviceId)
+			deviceId = convertCoreApiIdToRegistryMacId(db, coreDeviceId, log)
 		} else {
 			deviceId = ctx.Params("deviceId", "")
 		}

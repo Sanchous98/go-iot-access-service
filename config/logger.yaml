@@ -1,0 +1,26 @@
+level: error
+development: true
+#disableCaller:
+#disableStacktrace:
+#sampling:
+encoding: console
+encoderConfig:
+  messageKey: M
+  levelKey: L
+  timeKey: T
+  nameKey: N
+  callerKey: C
+  stacktraceKey: S
+  skipLineEnding:
+  lineEnding: \n
+  levelEncoder: capital
+  timeEncoder: ISO8601
+  durationEncoder: string
+#  callerEncoder:
+#  nameEncoder:
+#  consoleSeparator:
+outputPaths:
+  - stderr
+errorOutputPaths:
+  - stderr
+#initialFields:

@@ -8,23 +8,18 @@ import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/cache"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/http"
+	loggerWrapper "bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/logger"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/repositories"
 	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/services"
+	"bitbucket.org/4suites/iot-service-golang/pkg/infrastructure/unsafe"
 	"context"
-	"github.com/allegro/bigcache/v3"
-	"log"
-	"strconv"
-	"time"
-
 	"github.com/Sanchous98/go-di"
 	gocache "github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/metrics"
 	"github.com/eko/gocache/lib/v4/store"
-	bigCacheStore "github.com/eko/gocache/store/bigcache/v4"
-	redisStore "github.com/eko/gocache/store/redis/v4"
-	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"log"
 )
 
 func main() {
@@ -32,7 +27,7 @@ func main() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("%v", err)
+			log.Printf("%#v", err)
 			cancel()
 		}
 	}()
@@ -40,18 +35,14 @@ func main() {
 	app := di.Application(ctx)
 	app.AddEntryPoint(internal.Bootstrap)
 
+	app.Set(loggerWrapper.Factory)
+
 	app.Set(new(http.ServerApi))
 	app.Set(new(api.AccessApiHandler), "api.handler")
 	app.Set(func(environment di.GlobalState) *gorm.DB {
-		db, err := gorm.Open(mysql.Open(environment.GetParam("DATABASE_DSN")))
-
-		if err != nil {
-			panic(err)
-		}
-
-		return db
+		return unsafe.Must(gorm.Open(mysql.Open(environment.GetParam("DATABASE_DSN"))))
 	})
-	app.Set(cacheFactory(ctx))
+	app.Set(cache.Factory(ctx))
 
 	promMetrics := metrics.NewPrometheus("go-iot-access-service")
 
@@ -84,40 +75,10 @@ func main() {
 	app.Set(func(container di.Container) application.GatewayRepository {
 		return container.Get((*repositories.GatewayRepository)(nil)).(*repositories.GatewayRepository)
 	})
-	app.Set(func(container di.Container) application.HandlerPool {
-		return container.Build(new(services.HandlerAggregator)).(*services.HandlerAggregator)
+	app.Set(new(services.MessageAggregator))
+	app.Set(func(container di.Container) application.ClientPool {
+		return container.Get((*services.MessageAggregator)(nil)).(application.ClientPool)
 	})
 	app.Set(new(listeners.VerifyOnlineHandler), "mqtt.message_handler")
-
 	app.Run(app.LoadEnv)
-}
-
-func cacheFactory(ctx context.Context) func(environment di.GlobalState) store.StoreInterface {
-	return func(environment di.GlobalState) store.StoreInterface {
-		switch environment.GetParam("CACHE_STORAGE") {
-		case "null", "":
-			return new(cache.NullStore)
-		case "memory":
-			db, err := bigcache.New(ctx, bigcache.DefaultConfig(5*time.Minute))
-
-			if err != nil {
-				panic(err)
-			}
-
-			return bigCacheStore.NewBigcache(db)
-		case "redis":
-			db, err := strconv.Atoi(environment.GetParam("REDIS_DB"))
-
-			if err != nil {
-				panic(err)
-			}
-
-			return redisStore.NewRedis(redis.NewClient(&redis.Options{
-				Addr: environment.GetParam("REDIS_HOST"),
-				DB:   db,
-			}), store.WithExpiration(1*time.Hour))
-		}
-
-		panic("unknown cache storage")
-	}
 }

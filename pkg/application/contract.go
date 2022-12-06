@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type HandlerPool interface {
+type ClientPool interface {
 	GetClient(clientId string) mqtt.Client
 	DeleteClient(clientId string)
 	Register(handlers ...Handler)
@@ -27,7 +27,6 @@ type Repository[T WithResource] interface {
 	FindAll() []T
 	FindBy(map[string]any) []T
 	FindOneBy(map[string]any) T
-	//Drop(T)
 }
 
 type GatewayRepository interface {

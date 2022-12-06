@@ -2,12 +2,10 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/eko/gocache/lib/v4/store"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2/utils"
-	"log"
 )
 
 type Cache[T any] struct {
@@ -22,9 +20,6 @@ func (c *Cache[T]) Get(ctx context.Context, key any) (*T, error) {
 	item, err := c.store.Get(ctx, key)
 
 	if err != nil {
-		if !errors.Is(err, new(store.NotFound)) {
-			log.Println(err)
-		}
 		return new(T), err
 	}
 

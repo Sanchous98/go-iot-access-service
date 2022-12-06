@@ -2,32 +2,34 @@ package repositories
 
 import (
 	"bitbucket.org/4suites/iot-service-golang/pkg/domain/entities"
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"context"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/google/uuid"
-	"log"
 )
 
 type BrokerRepository struct {
 	RegistryRepository[*entities.Broker] `inject:""`
 
 	cache cache.CacheInterface[*entities.Broker] `inject:""`
+
+	log logger.Logger `inject:""`
 }
 
-func (r *BrokerRepository) Find(id uuid.UUID) *entities.Broker {
-	if item, err := r.cache.Get(context.Background(), id.String()); err == nil && item != nil {
-		log.Printf("Broker %s hitted cache\n", id.String())
-		return item
-	}
+func (r *BrokerRepository) Find(id uuid.UUID) (item *entities.Broker) {
+	var err error
 
-	item := r.RegistryRepository.find(id, nil)
+	if item, err = r.cache.Get(context.Background(), id.String()); err != nil {
+		item = r.RegistryRepository.find(id, map[string]any{"include": "gateway.broker"})
 
-	if item == nil {
-		return nil
-	}
+		if item == nil {
+			r.log.Debugf("Device %s not found\n", id.String())
+			return
+		}
 
-	if err := r.cache.Set(context.Background(), id.String(), item); err != nil {
-		log.Println(err)
+		r.pushCache(item)
+	} else {
+		r.log.Infof("Device %s hit cache\n", id.String())
 	}
 
 	return item
@@ -51,10 +53,14 @@ func (r *BrokerRepository) FindBy(params map[string]any) []*entities.Broker {
 	brokers := r.RegistryRepository.findAll(params)
 
 	for _, broker := range brokers {
-		if err := r.cache.Set(context.Background(), broker.Id, broker); err != nil {
-			log.Println(err)
-		}
+		r.pushCache(broker)
 	}
 
 	return brokers
+}
+
+func (r *BrokerRepository) pushCache(broker *entities.Broker) {
+	if err := r.cache.Set(context.Background(), broker.Id, broker); err != nil {
+		r.log.Errorln(err)
+	}
 }

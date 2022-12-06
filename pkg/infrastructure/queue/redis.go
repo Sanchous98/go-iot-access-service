@@ -1,21 +1,22 @@
 package queue
 
 import (
+	"bitbucket.org/4suites/iot-service-golang/pkg/domain/logger"
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
-	"log"
 )
 
 type RedisQueue struct {
 	store *redis.Client
+	log   logger.Logger
 }
 
 func (r *RedisQueue) Push(ctx context.Context, queue string, item string) {
-	result, err := json.Marshal(&item)
+	result, err := json.MarshalNoEscape(&item)
 
 	if err != nil {
-		log.Println("Cannot push item to queue! ", err)
+		r.log.Errorf("Cannot push item to queue! %v\n", err)
 		return
 	}
 
@@ -46,6 +47,6 @@ func (r *RedisQueue) Len(ctx context.Context, queue string) int {
 	return int(r.store.LLen(ctx, queue).Val())
 }
 
-func New(store *redis.Client) *RedisQueue {
-	return &RedisQueue{store}
+func New(store *redis.Client, log logger.Logger) *RedisQueue {
+	return &RedisQueue{store, log}
 }
